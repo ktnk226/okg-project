@@ -43,7 +43,7 @@
       background: transparent; border: none; border-radius: var(--radius-sm);
       color: var(--muted2); font-size: 16px; font-weight: 700; text-align: left; cursor: pointer; transition: all 0.2s;
     }
-    .nav-item:hover { background: rgba(255,255,255,0.03); color: #fff; }
+    .nav-item:hover { background: rgba(255,255,200,0.03); color: #fff; }
     .nav-item.active { background: linear-gradient(135deg, var(--accent), var(--accent2)); color: #fff; font-weight: 900; }
 
     /* HEADER TOPBAR */
@@ -547,12 +547,12 @@ function App() {
     const n = v => parseFloat(v) || 0;
     const [targetYear, targetMonth] = date.split('-').map(Number);
     
-    let monthTotal = 0; let monthReal = 0; let monthQue = 0; let monthCnt = 0; let monthHours = 0;
-    let weekTotal = 0; let weekReal = 0; let weekQue = 0; let weekCnt = 0; let weekHours = 0;
-    let yearTotal = 0; let yearReal = 0; let yearQue = 0; let yearCnt = 0; let yearHours = 0;
+    let monthTotal = 0; let monthReal = 0; let monthQue = 0; let monthCnt = 0; let monthHours = 0; let monthKm = 0;
+    let weekTotal = 0; let weekReal = 0; let weekQue = 0; let weekCnt = 0; let weekHours = 0; let weekKm = 0;
+    let yearTotal = 0; let yearReal = 0; let yearQue = 0; let yearCnt = 0; let yearHours = 0; let yearKm = 0;
 
-    let weekMonThu = { total: 0, real: 0, que: 0, cnt: 0, hours: 0 };
-    let weekFriSun = { total: 0, real: 0, que: 0, cnt: 0, hours: 0 };
+    let weekMonThu = { total: 0, real: 0, que: 0, cnt: 0, hours: 0, km: 0 };
+    let weekFriSun = { total: 0, real: 0, que: 0, cnt: 0, hours: 0, km: 0 };
 
     const createPfBuffer = () => ({ d: { s:0, c:0 }, u: { s:0, c:0 }, r: { s:0, c:0 }, m: { s:0, c:0 } });
     const weekPf = createPfBuffer();
@@ -567,6 +567,7 @@ function App() {
       const sales = n(lastS.d_cum) + n(lastS.u_cum) + n(lastS.r_cum) + n(lastS.m_cum);
       const que = n(lastS.d_que_cum) + n(lastS.u_que_cum) + n(lastS.r_que_cum) + n(lastS.m_que_cum);
       const cnt = n(lastS.d_cnt_cum) + n(lastS.u_cnt_cum) + n(lastS.r_cnt_cum) + n(lastS.m_cnt_cum);
+      const km = n(lastS.km_cum);
       const totalAmt = sales + que;
 
       const dayCalced = sList.map(s => ({ dur: calcDuration(s.start, s.end) }));
@@ -578,14 +579,14 @@ function App() {
       });
 
       if (y === targetYear) {
-        yearTotal += totalAmt; yearReal += sales; yearQue += que; yearCnt += cnt; yearHours += dayTotalHours;
+        yearTotal += totalAmt; yearReal += sales; yearQue += que; yearCnt += cnt; yearHours += dayTotalHours; yearKm += km;
         PLATFORMS.forEach(p => {
           const pData = getPfData(p.key);
           yearPf[p.key].s += pData.sales; yearPf[p.key].c += pData.cnt;
         });
 
         if (m === targetMonth) {
-          monthTotal += totalAmt; monthReal += sales; monthQue += que; monthCnt += cnt; monthHours += dayTotalHours;
+          monthTotal += totalAmt; monthReal += sales; monthQue += que; monthCnt += cnt; monthHours += dayTotalHours; monthKm += km;
           PLATFORMS.forEach(p => {
             const pData = getPfData(p.key);
             monthPf[p.key].s += pData.sales; monthPf[p.key].c += pData.cnt;
@@ -598,7 +599,7 @@ function App() {
       const sunMidnight = new Date(periodMeta.sunRef); sunMidnight.setHours(23,59,59,999);
 
       if (thisDate >= monMidnight && thisDate <= sunMidnight) {
-        weekTotal += totalAmt; weekReal += sales; weekQue += que; weekCnt += cnt; weekHours += dayTotalHours;
+        weekTotal += totalAmt; weekReal += sales; weekQue += que; weekCnt += cnt; weekHours += dayTotalHours; weekKm += km;
         PLATFORMS.forEach(p => {
           const pData = getPfData(p.key);
           weekPf[p.key].s += pData.sales; weekPf[p.key].c += pData.cnt;
@@ -606,9 +607,9 @@ function App() {
 
         const dayOfWeek = thisDate.getDay();
         if (dayOfWeek >= 1 && dayOfWeek <= 4) {
-          weekMonThu.total += totalAmt; weekMonThu.real += sales; weekMonThu.que += que; weekMonThu.cnt += cnt; weekMonThu.hours += dayTotalHours;
+          weekMonThu.total += totalAmt; weekMonThu.real += sales; weekMonThu.que += que; weekMonThu.cnt += cnt; weekMonThu.hours += dayTotalHours; weekMonThu.km += km;
         } else {
-          weekFriSun.total += totalAmt; weekFriSun.real += sales; weekFriSun.que += que; weekFriSun.cnt += cnt; weekFriSun.hours += dayTotalHours;
+          weekFriSun.total += totalAmt; weekFriSun.real += sales; weekFriSun.que += que; weekFriSun.cnt += cnt; weekFriSun.hours += dayTotalHours; weekFriSun.km += km;
         }
       }
     });
@@ -621,9 +622,9 @@ function App() {
     });
 
     return { 
-      day: { total: daySummary.total_sales, real: daySummary.real_sales, que: daySummary.total_que, cnt: daySummary.total_cnt, hours: daySummary.total_h, pf: dayPf },
+      day: { total: daySummary.total_sales, real: daySummary.real_sales, que: daySummary.total_que, cnt: daySummary.total_cnt, hours: daySummary.total_h, km: daySummary.total_km, pf: dayPf },
       week: { 
-        total: weekTotal, real: weekReal, que: weekQue, cnt: weekCnt, hours: weekHours, pf: weekPf,
+        total: weekTotal, real: weekReal, que: weekQue, cnt: weekCnt, hours: weekHours, km: weekKm, pf: weekPf,
         monThu: {
           ...weekMonThu,
           jikyu: weekMonThu.hours > 0 ? Math.round(weekMonThu.total / weekMonThu.hours) : 0,
@@ -639,8 +640,8 @@ function App() {
           uph: weekFriSun.hours > 0 ? (weekFriSun.cnt / weekFriSun.hours).toFixed(1) : '0.0'
         }
       },
-      month: { total: monthTotal, real: monthReal, que: monthQue, cnt: monthCnt, hours: monthHours, pf: monthPf },
-      year: { total: yearTotal, real: yearReal, que: yearQue, cnt: yearCnt, hours: yearHours, pf: yearPf }
+      month: { total: monthTotal, real: monthReal, que: monthQue, cnt: monthCnt, hours: monthHours, km: monthKm, pf: monthPf },
+      year: { total: yearTotal, real: yearReal, que: yearQue, cnt: yearCnt, hours: yearHours, km: yearKm, pf: yearPf }
     };
   }, [vault, date, daySummary, periodMeta, sets]);
 
@@ -980,12 +981,14 @@ function App() {
               <div class="sum-item"><div class="sum-label">1件単価</div><div class="sum-val">{activePeriodData.cnt > 0 ? activePeriodData.tanka.toLocaleString()+'円' : '-'}</div></div>
               <div class="sum-item"><div class="sum-label">クエ抜き単価</div><div class="sum-val">{activePeriodData.cnt > 0 ? activePeriodData.realTanka.toLocaleString()+'円' : '-'}</div></div>
             </div>
-            <div class="sum-row">
+            {/* 走行距離を追加した3カラム行 */}
+            <div class="sum-row col-3">
               <div class="sum-item">
                 <div class="sum-label">実働時間</div>
                 <div class="sum-val">{activePeriodData.hours > 0 ? formatHours(activePeriodData.hours) : '-'}</div>
               </div>
               <div class="sum-item"><div class="sum-label">時給換算</div><div class="sum-val yellow">{activePeriodData.hours > 0 ? activePeriodData.periodJikyu.toLocaleString()+'円' : '-'}</div></div>
+              <div class="sum-item"><div class="sum-label">走行距離</div><div class="sum-val teal">{activePeriodData.km > 0 ? `${activePeriodData.km}km` : '-'}</div></div>
             </div>
           </div>
         )}
@@ -1025,7 +1028,7 @@ function App() {
           </div>
         )}
 
-        {/* 🎯 GOAL PANEL */}
+        {/* 🎯 GOAL PANEL (目標パネルを上に配置) */}
         {activeTab === 'dashboard' && (
           <div class="goal-panel">
             <div class="goal-inputs-container">
@@ -1100,6 +1103,28 @@ function App() {
 
         {/* ── TAB 1: DASHBOARD (HOME) ── */}
         <div class={`view-container ${activeTab === 'dashboard' ? 'active' : ''}`}>
+          
+          {/* 📊 プラットフォーム別内訳 (目標パネル直下に配置) */}
+          <div class="section-title" style={{marginTop: 0}}>📊 プラットフォーム別内訳</div>
+          <div class="card" style={{padding:'14px 18px'}}>
+            <div style={{display:'flex', flexDirection:'column', gap:'12px'}}>
+              {PLATFORMS.map(p => {
+                const targetPf = activePeriodData.pf?.[p.key] || { s: 0, c: 0 };
+                const pfTanka = targetPf.c > 0 ? Math.round(targetPf.s / targetPf.c) : 0;
+                return (
+                  <div key={p.key} style={{display:'flex', justifyContent:'space-between', alignItems:'center', fontSize:'15px', borderBottom:'1px solid var(--border)', paddingBottom:'8px'}}>
+                    <span style={{color: p.color, fontWeight:'800'}}>{p.label}</span>
+                    <span class="font-mono" style={{fontWeight: '800'}}>
+                      {targetPf.s.toLocaleString()} 円 
+                      <span style={{fontSize:'12px', color:'var(--muted2)', marginLeft:'6px'}}>{targetPf.c} 件</span>
+                      <span style={{fontSize:'12px', color:'var(--teal)', marginLeft:'8px'}}>(単価: {pfTanka > 0 ? pfTanka.toLocaleString() + '円' : '-'})</span>
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
           {period === 'day' && (
             <>
               <div class="section-title">📝 本日の概要 & コンディション</div>
@@ -1133,27 +1158,6 @@ function App() {
               </div>
             </>
           )}
-
-          {/* プラットフォーム内訳 */}
-          <div class="section-title">📊 プラットフォーム別内訳</div>
-          <div class="card" style={{padding:'14px 18px'}}>
-            <div style={{display:'flex', flexDirection:'column', gap:'12px'}}>
-              {PLATFORMS.map(p => {
-                const targetPf = activePeriodData.pf?.[p.key] || { s: 0, c: 0 };
-                const pfTanka = targetPf.c > 0 ? Math.round(targetPf.s / targetPf.c) : 0;
-                return (
-                  <div key={p.key} style={{display:'flex', justifyContent:'space-between', alignItems:'center', fontSize:'15px', borderBottom:'1px solid var(--border)', paddingBottom:'8px'}}>
-                    <span style={{color: p.color, fontWeight:'800'}}>{p.label}</span>
-                    <span class="font-mono" style={{fontWeight: '800'}}>
-                      {targetPf.s.toLocaleString()} 円 
-                      <span style={{fontSize:'12px', color:'var(--muted2)', marginLeft:'6px'}}>{targetPf.c} 件</span>
-                      <span style={{fontSize:'12px', color:'var(--teal)', marginLeft:'8px'}}>(単価: {pfTanka > 0 ? pfTanka.toLocaleString() + '円' : '-'})</span>
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
 
           {/* セット詳細 */}
           {period === 'day' && (
@@ -1414,7 +1418,7 @@ function App() {
             <svg class="nav-icon" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="18" y2="10"/></svg><span>カレンダー</span>
           </button>
           <button class={`tab-btn ${activeTab === 'settings' ? 'active' : ''}`} onClick={() => setActiveTab('settings')}>
-            <svg class="nav-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83-2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg><span>設定</span>
+            <svg class="nav-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83-2.83l-.06-.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg><span>設定</span>
           </button>
         </nav>
       </div>
