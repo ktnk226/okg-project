@@ -122,9 +122,9 @@
     .progress-bar { height: 100%; background: linear-gradient(90deg, var(--accent), var(--accent2)); transition: width 0.3s ease; }
     .progress-bar.green { background: linear-gradient(90deg, var(--teal), var(--green)); }
     
-    .goal-footer-row { display: flex; justify-content: space-between; font-size: 14px; font-family: var(--font-mono); flex-direction: column; gap: 5px; }
-    .goal-footer-top { display: flex; justify-content: space-between; width: 100%; }
-    .goal-footer-bottom { font-size: 13px; color: var(--teal); text-align: right; width: 100%; font-weight: 800; }
+    .goal-footer-row { display: flex; justify-content: space-between; font-size: 14px; font-family: var(--font-mono); flex-direction: column; gap: 4px; }
+    .goal-footer-top { display: flex; justify-content: space-between; width: 100%; align-items: center; }
+    .goal-footer-sub { display: flex; justify-content: flex-end; align-items: center; gap: 10px; font-size: 12px; font-family: var(--font-mono); margin-top: 2px; }
     .goal-status-text { color: var(--muted); }
     .goal-status-text strong { color: #fff; }
     .goal-remain-text { font-weight: 800; }
@@ -422,7 +422,7 @@ function App() {
   const [memoSearch, setMemoSearch] = useState('');
   const [newMemoText, setNewMemoText] = useState('');
   const [newMemoCat, setNewMemoCat] = useState('🛵稼働');
-  const [editingMemoId, setEditingMemoId] = useState(null); // 開いているメモのID
+  const [editingMemoId, setEditingMemoId] = useState(null);
 
   const [showLog, setShowLog] = useState(false);
   const [isDirty, setIsDirty] = useState(false);
@@ -538,7 +538,8 @@ function App() {
       weekStr: `${mon.getFullYear()}年 第${getYearWeekStr(date).split('-W')[1]}週 (${String(mon.getMonth()+1).padStart(2,'0')}/${String(mon.getDate()).padStart(2,'0')}〜${String(sun.getMonth()+1).padStart(2,'0')}/${String(sun.getDate()).padStart(2,'0')})`,
       monthStr: `${y}年 ${m}月 累計`,
       yearStr: `${y}年 年間累計`,
-      monRef: mon, sunRef: sun
+      monRef: mon, sunRef: sun,
+      dayOfWeek: day
     };
   }, [date]);
 
@@ -643,6 +644,7 @@ function App() {
     };
   }, [vault, date, daySummary, periodMeta, sets]);
 
+  /* 🎯 パターンB: 目標・進捗 & PF別必要件数換算ロジック */
   const activePeriodData = useMemo(() => {
     const data = periodicAnalysis[period];
     const rawGoal = periodicGoals[goalStorageKey];
@@ -655,6 +657,20 @@ function App() {
     const tanka = data.cnt > 0 ? Math.round(data.total / data.cnt) : 0;
     const realTanka = data.cnt > 0 ? Math.round(data.real / data.cnt) : 0;
     const needCnt = (remainAmt > 0 && tanka > 0) ? Math.ceil(remainAmt / tanka) : 0;
+
+    // パターンB: 稼働前は基準単価、実績が出たらリアル単価に自動連動
+    const isWeekend = (periodMeta.dayOfWeek === 0 || periodMeta.dayOfWeek === 6);
+    const defaultDemaeTanka = isWeekend ? 550 : 500;
+    const defaultUberTanka = 350;
+
+    const dPf = data.pf?.d || { s: 0, c: 0 };
+    const uPf = data.pf?.u || { s: 0, c: 0 };
+
+    const effectiveDTanka = dPf.c > 0 ? Math.round(dPf.s / dPf.c) : defaultDemaeTanka;
+    const effectiveUTanka = uPf.c > 0 ? Math.round(uPf.s / uPf.c) : defaultUberTanka;
+
+    const needCntD = (remainAmt > 0 && effectiveDTanka > 0) ? Math.ceil(remainAmt / effectiveDTanka) : 0;
+    const needCntU = (remainAmt > 0 && effectiveUTanka > 0) ? Math.ceil(remainAmt / effectiveUTanka) : 0;
 
     let dailyNorma = 0;
     if (remainAmt > 0) {
@@ -676,8 +692,12 @@ function App() {
     const periodJikyu = data.hours > 0 ? Math.round(data.total / data.hours) : 0;
     const uph = data.hours > 0 ? (data.cnt / data.hours).toFixed(1) : '0.0';
 
-    return { ...data, goalAmt, goalCnt, remainAmt, percentAmt, remainCnt, percentCnt, needCnt, dailyNorma, periodJikyu, tanka, realTanka, uph };
-  }, [periodicAnalysis, period, periodicGoals, goalStorageKey, date]);
+    return { 
+      ...data, goalAmt, goalCnt, remainAmt, percentAmt, remainCnt, percentCnt, needCnt, 
+      needCntD, needCntU, effectiveDTanka, effectiveUTanka, isRealD: dPf.c > 0, isRealU: uPf.c > 0,
+      dailyNorma, periodJikyu, tanka, realTanka, uph 
+    };
+  }, [periodicAnalysis, period, periodicGoals, goalStorageKey, date, periodMeta]);
 
   const handleStepPeriod = (direction) => {
     const current = new Date(date);
@@ -1037,6 +1057,25 @@ function App() {
                       <div class="goal-remain-text remain">残り {activePeriodData.remainAmt.toLocaleString()}円</div>
                     )}
                   </div>
+                  
+                  {/* ⚡ パターンB: プラットフォーム別 目安必要件数の即時換算 */}
+                  {activePeriodData.remainAmt > 0 && (
+                    <div class="goal-footer-sub">
+                      <span style={{ color: 'var(--muted)' }}>目安残数:</span>
+                      <span style={{ color: '#ff5555', fontWeight: '800' }}>
+                        D: 約{activePeriodData.needCntD}件
+                        <span style={{ fontSize: '10px', color: 'var(--muted)', marginLeft: '3px' }}>
+                          ({activePeriodData.effectiveDTanka}円{activePeriodData.isRealD ? '' : '基'})
+                        </span>
+                      </span>
+                      <span style={{ color: '#00e676', fontWeight: '800' }}>
+                        U: 約{activePeriodData.needCntU}件
+                        <span style={{ fontSize: '10px', color: 'var(--muted)', marginLeft: '3px' }}>
+                          ({activePeriodData.effectiveUTanka}円{activePeriodData.isRealU ? '' : '基'})
+                        </span>
+                      </span>
+                    </div>
+                  )}
                 </div>
               </div>
             )}
@@ -1240,7 +1279,6 @@ function App() {
                   <span>{m.date} {m.time}</span>
                 </div>
                 
-                {/* タップで全体編集できるプレビュー */}
                 <div class="memo-preview-text">
                   {m.text || <span style={{color:'var(--muted)'}}>（内容がありません）</span>}
                 </div>
