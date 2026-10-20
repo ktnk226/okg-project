@@ -365,6 +365,35 @@
       .goal-title-flex { font-size: 16px; }
       .goal-footer-sub { font-size: 14px; flex-wrap: wrap; }
     }
+
+    /* Goals and platform readability */
+    .platform-overview { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 12px; margin-bottom: 22px; }
+    .platform-overview-card { background: var(--surface); border: 1px solid var(--border2); border-left: 4px solid;
+      border-radius: 12px; padding: 16px; min-width: 0; }
+    .platform-overview-name { font-size: 17px; font-weight: 900; margin-bottom: 9px; }
+    .platform-overview-amount { font-size: 24px; font-weight: 900; font-family: var(--font-mono); overflow-wrap: anywhere; }
+    .platform-overview-amount small { font-size: 14px; font-weight: 700; }
+    .platform-overview-stats { display: flex; flex-wrap: wrap; gap: 6px 12px; font-size: 15px; margin-top: 8px; color: #d2d4dc; }
+    @media (max-width: 768px) {
+      .summary-bar .sum-row:last-of-type { padding-bottom: 0; }
+      .goal-panel { margin: 16px; padding: 18px 16px; border: 1px solid var(--border2); border-radius: 16px;
+        background: var(--surface); }
+      .goal-inputs-container { display: grid; grid-template-columns: 1fr; gap: 16px; }
+      .goal-input-row { display: flex; flex-direction: column; align-items: stretch; gap: 8px; }
+      .goal-title-flex { font-size: 17px; color: #e4e5eb; }
+      .goal-input-wrapper { width: 100%; max-width: none; display: flex; align-items: center; gap: 10px; }
+      .goal-input { min-width: 0; width: 100%; font-size: 21px; font-weight: 800; min-height: 52px; }
+      .goal-status-text, .goal-remain-text { font-size: 16px; }
+      .progress-section { margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--border); }
+      .progress-track { min-height: 12px; border-radius: 9px; }
+      .goal-footer-top { gap: 8px; flex-wrap: wrap; }
+      .goal-footer-sub { justify-content: flex-start; line-height: 1.7; }
+      .goal-footer-sub span span { font-size: 13px !important; }
+      .platform-overview { grid-template-columns: 1fr; gap: 10px; }
+      .platform-overview-card { padding: 15px 17px; }
+      .platform-overview-amount { font-size: 26px; }
+      .platform-overview-stats { font-size: 16px; }
+    }
   </style>
 </head>
 <body>
@@ -1032,21 +1061,21 @@ function App() {
                 <div class="sum-item"><div class="sum-label">実働時間</div><div class="sum-val">{activePeriodData.hours > 0 ? formatHours(activePeriodData.hours) : '-'}</div></div>
               </div>
               <div class="sum-row">
-                <div class="sum-item"><div class="sum-label">走行距離</div><div class="sum-val teal">{activePeriodData.km > 0 ? `${activePeriodData.km}km` : '-'}</div></div>
-                <div class="sum-item"><div class="sum-label">1件単価</div><div class="sum-val">{activePeriodData.cnt > 0 ? activePeriodData.tanka.toLocaleString()+'円' : '-'}</div></div>
+                <div class="sum-item"><div class="sum-label">UPH</div><div class="sum-val teal">{activePeriodData.uph}</div></div>
+                <div class="sum-item"><div class="sum-label">時給換算</div><div class="sum-val yellow">{activePeriodData.hours > 0 ? activePeriodData.periodJikyu.toLocaleString()+'円' : '-'}</div></div>
+                <div class="sum-item"><div class="sum-label">実質売上</div><div class="sum-val">{activePeriodData.real.toLocaleString()}円</div></div>
               </div>
               <div class="sum-row">
-                <div class="sum-item"><div class="sum-label">時給換算</div><div class="sum-val yellow">{activePeriodData.hours > 0 ? activePeriodData.periodJikyu.toLocaleString()+'円' : '-'}</div></div>
-                <div class="sum-item"><div class="sum-label">キロ単価</div><div class="sum-val">{activePeriodData.kmTanka > 0 ? activePeriodData.kmTanka.toLocaleString()+'円/km' : '-'}</div></div>
+                <div class="sum-item"><div class="sum-label">クエ抜き単価</div><div class="sum-val">{activePeriodData.cnt > 0 ? activePeriodData.realTanka.toLocaleString()+'円' : '-'}</div></div>
               </div>
             </div>
             <details class="summary-secondary">
-              <summary>その他の集計（実質売上・クエスト・UPH）</summary>
+              <summary>その他の集計</summary>
               <div class="summary-extra">
-                <div class="sum-row"><span>実質売上</span><span class="sum-val">{activePeriodData.real.toLocaleString()}円</span></div>
+                <div class="sum-row"><span>走行距離</span><span class="sum-val">{activePeriodData.km > 0 ? activePeriodData.km+'km' : '-'}</span></div>
+                <div class="sum-row"><span>キロ単価</span><span class="sum-val">{activePeriodData.kmTanka > 0 ? activePeriodData.kmTanka.toLocaleString()+'円/km' : '-'}</span></div>
+                <div class="sum-row"><span>1件単価</span><span class="sum-val">{activePeriodData.cnt > 0 ? activePeriodData.tanka.toLocaleString()+'円' : '-'}</span></div>
                 <div class="sum-row"><span>クエスト合計</span><span class="sum-val">{activePeriodData.que.toLocaleString()}円</span></div>
-                <div class="sum-row"><span>UPH</span><span class="sum-val">{activePeriodData.uph}</span></div>
-                <div class="sum-row"><span>クエ抜き単価</span><span class="sum-val">{activePeriodData.cnt > 0 ? activePeriodData.realTanka.toLocaleString()+'円' : '-'}</span></div>
               </div>
             </details>
             {period === 'day' && <button class="quick-log-btn" onClick={() => document.getElementById('delivery-set-entry')?.scrollIntoView({behavior:'smooth',block:'start'})}>＋ 稼働セットを入力</button>}
@@ -1164,25 +1193,18 @@ function App() {
         {/* ── TAB 1: DASHBOARD (HOME) ── */}
         <div class={`view-container ${activeTab === 'dashboard' ? 'active' : ''}`}>
           
-          {/* 📊 プラットフォーム別内訳 (目標パネル直下に配置) */}
-          <div class="section-title" style={{marginTop: 0}}>📊 プラットフォーム別内訳</div>
-          <div class="card" style={{padding:'14px 18px'}}>
-            <div style={{display:'flex', flexDirection:'column', gap:'12px'}}>
-              {PLATFORMS.map(p => {
-                const targetPf = activePeriodData.pf?.[p.key] || { s: 0, c: 0 };
-                const pfTanka = targetPf.c > 0 ? Math.round(targetPf.s / targetPf.c) : 0;
-                return (
-                  <div key={p.key} style={{display:'flex', justifyContent:'space-between', alignItems:'center', fontSize:'15px', borderBottom:'1px solid var(--border)', paddingBottom:'8px'}}>
-                    <span style={{color: p.color, fontWeight:'800'}}>{p.label}</span>
-                    <span class="font-mono" style={{fontWeight: '800'}}>
-                      {targetPf.s.toLocaleString()} 円 
-                      <span style={{fontSize:'12px', color:'var(--muted2)', marginLeft:'6px'}}>{targetPf.c} 件</span>
-                      <span style={{fontSize:'12px', color:'var(--teal)', marginLeft:'8px'}}>(単価: {pfTanka > 0 ? pfTanka.toLocaleString() + '円' : '-'})</span>
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
+          {/* Platform breakdown: stacked cards for narrow screens */}
+          <div class="section-title" style={{marginTop: 0}}>プラットフォーム別内訳</div>
+          <div class="platform-overview">
+            {PLATFORMS.map(p => {
+              const targetPf = activePeriodData.pf?.[p.key] || { s: 0, c: 0 };
+              const pfTanka = targetPf.c > 0 ? Math.round(targetPf.s / targetPf.c) : 0;
+              return <div key={p.key} class="platform-overview-card" style={{borderLeftColor:p.color}}>
+                <div class="platform-overview-name" style={{color:p.color}}>{p.label}</div>
+                <div class="platform-overview-amount">{targetPf.s.toLocaleString()}<small> 円</small></div>
+                <div class="platform-overview-stats"><span>{targetPf.c} 件</span><span>平均 {pfTanka > 0 ? pfTanka.toLocaleString()+'円/件' : '-'}</span></div>
+              </div>;
+            })}
           </div>
 
           {period === 'day' && (
