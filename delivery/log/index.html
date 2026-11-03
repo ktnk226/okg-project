@@ -426,6 +426,45 @@
     .planner-results .card {margin-bottom:0;}
     @media(min-width:1100px){.planner.view-container {max-width:1200px;} .planner-results{grid-template-columns:repeat(3,minmax(0,1fr));}}
     @media(max-width:480px){.planner .grid-3{grid-template-columns:1fr;} .planner .grid-2{grid-template-columns:1fr;} }
+
+    .planner-home {padding:16px; margin:0 auto;}
+    .planner .today-card {padding:22px; border:1px solid #343944; border-radius:22px; background:radial-gradient(ellipse at 100% 0,rgba(255,92,26,.09),transparent 55%),#101218; box-shadow:0 12px 32px rgba(0,0,0,.18);}
+    .today-heading {display:flex;justify-content:space-between;align-items:center;gap:12px;}
+    .today-eyebrow {font-family:var(--font-mono);font-size:11px;letter-spacing:.16em;color:#ff8c59;}
+    .planner .today-heading h3 {font-size:22px;margin:2px 0 0;letter-spacing:.02em;}
+    .today-date {font-family:var(--font-mono);font-size:14px;color:#adb3c0;}
+    .today-basis {font-size:12px;color:#a6adba;margin-top:8px;}
+    .today-hero {padding:24px 0 12px;}
+    .today-hero>span {font-size:14px;color:#c5cad3;}
+    .today-amount {font-family:var(--font-mono);font-size:clamp(34px,10vw,52px);font-weight:800;line-height:1.35;letter-spacing:-.04em;color:#fff;}
+    .today-amount small {font-family:var(--font-body);font-size:19px;letter-spacing:0;margin-left:8px;color:#aeb6c5;}
+    .today-amount.is-empty {font-family:var(--font-body);font-size:30px;color:#858fa1;letter-spacing:.05em;}
+    .today-track {height:5px;background:#252a35;border-radius:4px;overflow:hidden;}
+    .today-track>span {display:block;height:100%;background:linear-gradient(90deg,#ff5c1a,#ffa369);border-radius:4px;transition:width .2s;}
+    .today-target {display:flex;justify-content:space-between;gap:12px;align-items:center;font-size:13px;color:#9da7b8;padding:10px 0;}
+    .today-target strong {font-family:var(--font-mono);color:#dfe4ed;font-size:14px;}
+    .planner .today-empty {font-size:13px;color:#a7afbe;line-height:1.7;margin:0 0 16px;}
+    .today-metrics {display:grid;grid-template-columns:1fr 1fr;gap:12px;border-top:1px solid #292f3a;padding:16px 0;margin-top:10px;}
+    .today-metrics>div {display:flex;flex-direction:column;gap:4px;min-width:0;}
+    .today-metrics>div+div {border-left:1px solid #292f3a;padding-left:16px;}
+    .today-metrics span {font-size:12px;color:#a8b1c0;}
+    .today-metrics strong {font-size:19px;line-height:1.5;color:#f1f4fa;}
+    .today-metrics small {font-size:13px;margin-left:5px;color:#a8b1c0;}
+    .today-quest {padding:15px 16px;background:#111e1a;border:1px solid #224436;border-radius:14px;margin-top:8px;}
+    .today-quest-head,.today-quest-progress {display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;}
+    .today-quest-head {font-size:12px;color:#b5c8be;}
+    .today-quest-head i {display:inline-block;width:6px;height:6px;background:#46da98;border-radius:50%;margin-right:6px;}
+    .today-quest-head>strong {font-size:15px;color:#71e6af;}
+    .today-quest-progress {margin:10px 0;}
+    .today-quest-progress strong {font-size:25px;font-family:var(--font-mono);line-height:1.3;}
+    .today-quest-progress small,.today-quest-progress>span {font-size:12px;font-family:var(--font-body);color:#9eb5a8;}
+    .quest-track>span {background:#4bd89b;}
+    .today-quest-foot {font-size:11px;color:#9bb1a4;text-align:right;margin-top:7px;}
+    .today-actions {display:grid;grid-template-columns:1.15fr 1fr;gap:10px;margin-top:20px;}
+    .today-actions .gen-btn {background:#ff641f;border-radius:12px;min-height:52px;font-size:16px;padding:12px;margin:0;}
+    .today-actions .gen-btn span {margin-left:6px;}
+    .planner .today-actions .today-edit {background:#1a1e27;border:1px solid #3c4453;border-radius:12px;color:#e0e5ee;padding:10px;font-size:14px;line-height:1.4;}
+    @media(max-width:480px){.planner .today-card{padding:20px 18px;} .today-actions{grid-template-columns:1.15fr 1fr;} }
   </style>
 </head>
 <body>
@@ -859,8 +898,23 @@ function Planner({view,vault,goals,date,p,onChange,navigate,error}) {
   return <section className={'planner '+(view==='dashboard'?'planner-home':'view-container active')}>
     {(view==='goals'||view==='simulator')&&<button className="gen-btn" onClick={()=>navigate('dashboard')}>← ホームへ</button>}
     {(notice||blocked)&&<p role="alert" style={{color:'var(--yellow)'}}>{notice||blocked}</p>}
-    {view==='dashboard'&&<div className="card"><h3>今日の残り・逆算</h3><p>{date} ／ クエスト達成前提</p>{!blocked&&<><strong>あと {yen(sum.remain)}</strong><p>{sum.need===null?'単価を設定してください':sum.need+'件'} ／ {ptime(sum.need,p.calc.uph)}</p><p>今日の目標 {yen(sum.target)} {sum.manual?'（手動）':'（自動）'}</p><p>本人件数目標まであと {Math.max(0,pn(goals['D-'+date]?.cnt)-day.cnt)}件</p>{active.map(q=><p key={q.id}>Uber：{pprogress(vault,q,date)}件 ／ 狙う回数まであと{Math.max(0,pn(q.count)+(q.aim==='extra'?10:0)-pprogress(vault,q,date))}件</p>)}</>}
-      <div className="grid-2"><button className="gen-btn" onClick={()=>navigate('simulator')}>逆算を開く</button><button className="gen-btn" onClick={()=>navigate('goals')}>目標を編集</button></div></div>}
+    {view==='dashboard'&&(()=>{
+      const hasGoal=sum.target>0||sum.manual;
+      const cntGoal=pn(goals['D-'+date]?.cnt);
+      const percent=hasGoal&&sum.target>0?Math.min(100,Math.round(sum.actual/sum.target*100)):0;
+      return <div className="card today-card">
+        <div className="today-heading"><div><span className="today-eyebrow">TODAY / PLAN</span><h3>今日のゴール</h3></div><span className="today-date">{date.slice(5).replace('-',' / ')}</span></div>
+        <div className="today-basis">クエスト達成時の報酬を含む計画</div>
+        {!blocked&&<>
+          <div className="today-hero"><span>{hasGoal?(sum.remain>0?'目標まであと':'売上目標クリア'):'売上目標'}</span><div className={'today-amount '+(!hasGoal?'is-empty':'')}>{hasGoal?<>{Math.round(sum.remain).toLocaleString()}<small>円</small></>:'未設定'}</div></div>
+          {hasGoal?<><div className="today-track"><span style={{width:percent+'%'}}/></div><div className="today-target"><span>{sum.manual?'設定した目標':'自動計算の目標'}</span><strong>{yen(sum.target)}</strong></div></>:<p className="today-empty">週・月の目標を設定すると、今日の必要量を計算します。</p>}
+          <div className="today-metrics"><div><span>必要件数</span><strong>{!hasGoal?'—':sum.need===null?'単価未設定':<>{sum.need}<small>件</small></>}</strong></div><div><span>必要時間</span><strong>{!hasGoal?'—':sum.need===0?'0分':ptime(sum.need,p.calc.uph)}</strong></div></div>
+          {cntGoal>0&&<div className="today-target"><span>今日の件数目標まで</span><strong>あと {Math.max(0,cntGoal-day.cnt)}件</strong></div>}
+          {active.map(q=>{const c=pprogress(vault,q,date),target=pn(q.count)+(q.aim==='extra'?10:0),left=Math.max(0,target-c);return <div className="today-quest" key={q.id}><div className="today-quest-head"><span><i/>Uber Eats クエスト</span><strong>{q.aim==='n'?'計画対象外':left?'あと '+left+'件':'目標回数に到達'}</strong></div><div className="today-quest-progress"><strong>{c}<small> / {target}件</small></strong><span>{q.aim==='extra'?'追加10回まで':q.aim==='n'?'未選択':'基本回数まで'}</span></div><div className="today-track quest-track"><span style={{width:Math.min(100,target?c/target*100:0)+'%'}}/></div><div className="today-quest-foot">期限 {pdate(q.end,1).slice(5).replace('-','/')} 04:00</div></div>;})}
+        </>}
+        <div className="today-actions"><button className="gen-btn" onClick={()=>navigate('simulator')}>逆算する <span>↗</span></button><button className="today-edit" onClick={()=>navigate('goals')}>目標を設定・編集</button></div>
+      </div>;
+    })()}
     {view==='goals'&&<><h2>目標管理</h2><p>上の期間切替で日・週・月・年の目標を編集できます。</p><div className="card"><h3>日別の稼働予定</h3><label>対象日<input type="date" value={editDate} onChange={e=>{if(e.target.value)setEditDate(e.target.value);}}/></label><select value={p.days[editDate]?.mode||'auto'} onChange={e=>dayChange('mode',e.target.value)}><option value="auto">自動配分</option><option value="off">休み</option><option value="amt">売上を指定（配分込）</option><option value="cnt">件数を指定</option></select>{['amt','cnt'].includes(p.days[editDate]?.mode)&&field('指定値',p.days[editDate]?.value||'',v=>dayChange('value',v))}<p>件数指定は逆算の会社・単価条件を使用します。</p><details><summary>今後の予定一覧</summary>{listDates.map(d=><p key={d}><button onClick={()=>setEditDate(d)}>{d}</button> {p.days[d]?.mode||'auto'} {p.days[d]?.value||''}</p>)}</details></div>
     <div className="card"><h3>Uber Eats 日跨ぎクエスト</h3><p>開始日の04:00〜最終営業日の翌日04:00（日本時間）。選んだ候補だけ登録します。</p><select value={questPart} onChange={e=>setQuestPart(e.target.value)}><option value="front">選択週の前半（月〜木）</option><option value="back">選択週の後半（金〜日）</option></select><button className="gen-btn" onClick={addQuest}>クエストを登録</button></div>
     {p.quests.map(q=><div className="card" key={q.id}><h3>{q.start} 〜 {q.end}</h3><p>終了：{pdate(q.end,1)} 04:00</p><label>Uber側で選択した回数<select value={q.count} onChange={e=>qchange(q.id,'count',Number(e.target.value))}>{Array.from({length:12},(_,i)=>(i+1)*10).map(n=><option key={n} value={n}>{n}回</option>)}</select></label>{field('基本達成報酬（円）',q.base,v=>qchange(q.id,'base',v))}{field('追加10回の報酬（円）',q.extra,v=>qchange(q.id,'extra',v))}<label>狙う段階<select value={q.aim} onChange={e=>qchange(q.id,'aim',e.target.value)}><option value="n">計画に含めない／未選択</option><option value="base">基本回数まで</option><option value="extra">追加10回まで</option></select></label><p>Uber実績 {pprogress(vault,q,date)}件 ／ 計画報酬 {yen(pbudget(q))}</p>
@@ -1452,7 +1506,7 @@ function App() {
             {isDirty ? (
               <div class="cloud-indicator unsaved" onClick={saveToiCloudJSON} style={{cursor:'pointer'}}>⚠️ 未保存 (保存)</div>
             ) : (
-              <div class="cloud-indicator">☁️ iCloud同期完了</div>
+              <div class="cloud-indicator">💾 JSON保存済み</div>
             )}
           </div>
         </header>
@@ -1948,5 +2002,6 @@ ReactDOM.createRoot(document.getElementById('root')).render(<App />);
 </script>
 </body>
 </html>
+
 
 
