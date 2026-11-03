@@ -25,6 +25,23 @@
     html, body { height: 100%; background: var(--bg); color: var(--text); font-family: var(--font-body); overflow-x: hidden; font-size: 16px; }
     
     #expense-form { scroll-margin-top: 100px; }
+
+    /* Keep Safari's native date field inside its expense-form grid cell. */
+    #expense-form .expense-date-amount {
+      display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px;
+    }
+    #expense-form .expense-date-amount > label { min-width: 0; }
+    #expense-form .expense-date-amount input {
+      display: block; width: 100%; min-width: 0; max-width: 100%;
+      min-height: 50px; -webkit-appearance: none; appearance: none;
+    }
+    #expense-form input[type="date"]::-webkit-date-and-time-value {
+      min-width: 0; text-align: left;
+    }
+    @media (max-width: 480px) {
+      #expense-form .expense-date-amount { grid-template-columns: minmax(0, 1fr); }
+    }
+
     #expense-form fieldset:disabled { opacity: .65; }
     button:disabled { cursor: wait; opacity: .6; }
 
@@ -617,7 +634,7 @@ function ExpenseView({expenses, onSave, loadError}) {
           <label class="add-btn" style={{textAlign:'center',fontSize:16}}>写真を選ぶ<input aria-label="レシート写真を選択" type="file" accept="image/*" onChange={scan} style={{display:'none'}} /></label>
         </div>
         <p style={{color:'var(--muted2)',fontSize:14,marginBottom:16}}>写真は端末内で読み取り、保存・送信しません。初回は読み取り用データの取得に時間がかかります。</p>
-        <div class="grid-2" style={{marginBottom:12}}>
+        <div class="expense-date-amount" style={{marginBottom:12}}>
           <label>日付<input aria-label="経費の日付" type="date" required value={form.date} onChange={e=>field('date',e.target.value)} /></label>
           <label>金額（円）<input aria-label="経費の金額" type="number" inputMode="numeric" min="1" max="999999999" step="1" required value={form.amount} onChange={e=>field('amount',e.target.value)} /></label>
         </div>
