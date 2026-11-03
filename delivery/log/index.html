@@ -569,9 +569,26 @@ async function expenseImageCanvas(file) {
     return canvas;
   } finally {URL.revokeObjectURL(url);}
 }
+
+function buildExpenseFreeeCSV(rows, settings, account) {
+  const quote = value => '"' + String(value ?? '').replace(/"/g, '""') + '"';
+  const header = ['収支区分','管理番号','発生日','決済期日','取引先コード','取引先','勘定科目','税区分','金額','税計算区分','税額','備考','品目','部門','メモタグ','決済日','決済口座','決済金額'];
+  const records = cleanExpenses(rows).sort((a,b)=>a.date.localeCompare(b.date)).map(e => {
+    const config = settings[e.id];
+    if (!config?.subject?.trim() || !config?.tax?.trim()) throw new Error('各経費の勘定科目と税区分を入力してください。');
+    const date = e.date.replace(/-/g,'/');
+    return ['支出',e.id,date,'','',e.payee,config.subject.trim(),config.tax.trim(),e.amount,'税込','',e.memo,'','','',account.trim() ? date : '',account.trim(),account.trim() ? e.amount : ''];
+  });
+  return '\uFEFF' + [header,...records].map(row=>row.map(quote).join(',')).join('\r\n') + '\r\n';
+}
+
 function ExpenseView({expenses, onSave, loadError}) {
   const empty = () => ({id:'',date:expenseToday(),amount:'',category:'その他',payee:'',memo:''});
   const [form,setForm] = useState(empty);
+  const [exportOpen,setExportOpen] = useState(false);
+  const [exportSettings,setExportSettings] = useState({});
+  const [exportAccount,setExportAccount] = useState('');
+  const [exportError,setExportError] = useState('');
   const [mode,setMode] = useState('month');
   const [month,setMonth] = useState(() => expenseToday().slice(0,7));
   const [year,setYear] = useState(() => expenseToday().slice(0,4));
@@ -583,6 +600,24 @@ function ExpenseView({expenses, onSave, loadError}) {
   const field = (key,value) => setForm(prev => ({...prev,[key]:value}));
   const rows = expenses.filter(e => (mode === 'all' || e.date.startsWith(mode === 'month' ? month : year)) && (category === 'すべて' || e.category === category)).sort((a,b)=>b.date.localeCompare(a.date));
   const total = rows.reduce((sum,e)=>sum+e.amount,0);
+  const openExport = () => {
+    const subjects = {'燃料費':'車両費','車両整備・修理':'修繕費','消耗品':'消耗品費','通信費':'通信費','保険料':'保険料','駐車・通行料':'旅費交通費','その他':'雑費'};
+    setExportSettings(prev=>Object.fromEntries(rows.map(e=>[e.id,prev[e.id] || {subject:subjects[e.category],tax:''}])));
+    setExportError(''); setExportOpen(true);
+  };
+  const exportCSV = () => {
+    try {
+      if (!rows.length) throw new Error('出力対象の経費がありません。');
+      const csv = buildExpenseFreeeCSV(rows,exportSettings,exportAccount);
+      const blob = new Blob([csv],{type:'text/csv;charset=utf-8'});
+      if (blob.size > 5000000) throw new Error('5MBを超えるため、集計期間を短くして出力してください。');
+      const url = URL.createObjectURL(blob), link = document.createElement('a');
+      link.href=url; link.download='freee_expenses_'+(mode==='all' ? 'all' : mode==='month' ? month : year)+'.csv';
+      document.body.appendChild(link); link.click(); link.remove();
+      setTimeout(()=>URL.revokeObjectURL(url),1000);
+      setExportError('CSVを出力しました。経費の記録はそのまま残っています。');
+    } catch (error) {setExportError(error.message);}
+  };
   const reset = () => {setForm(empty()); setRaw(''); setStatus('');};
   const save = event => {
     event.preventDefault();
@@ -657,6 +692,26 @@ function ExpenseView({expenses, onSave, loadError}) {
       <label>分類で絞り込み<select aria-label="経費の絞り込み" value={category} onChange={e=>setCategory(e.target.value)}>{['すべて',...EXPENSE_CATEGORIES].map(c=><option key={c}>{c}</option>)}</select></label>
       <p style={{fontSize:28,color:'var(--accent)',fontWeight:900,margin:'16px 0'}} data-testid="expense-total">{total.toLocaleString()} 円 <small style={{fontSize:16}}>／ {rows.length}件</small></p>
       {EXPENSE_CATEGORIES.map(c=>{const list=rows.filter(e=>e.category===c);return list.length>0 && <div key={c} style={{display:'flex',justifyContent:'space-between',gap:12,padding:'8px 0',borderTop:'1px solid var(--border)'}}><span>{c}</span><strong>{list.reduce((s,e)=>s+e.amount,0).toLocaleString()} 円</strong></div>;})}
+    </div>
+    <div class="card">
+      <button class="gen-btn" disabled={!rows.length || !!loadError} onClick={openExport}>freee用CSVをエクスポート（{rows.length}件）</button>
+      <p style={{fontSize:14,lineHeight:1.7,marginTop:10}}>現在の集計期間・分類で絞り込んだ経費を出力します。</p>
+      {exportOpen && <div style={{marginTop:16}}>
+        <p style={{fontSize:14,lineHeight:1.7}}>勘定科目は分類からの候補です。各明細の科目・税区分をfreeeの設定に合わせて確認してください。金額は税込として出力します。</p>
+        <label style={{marginTop:12}}>決済口座（任意）
+          <input aria-label="CSV決済口座" placeholder="空欄：未決済／入力例：現金" value={exportAccount} onChange={e=>setExportAccount(e.target.value)} />
+        </label>
+        <p style={{fontSize:14,lineHeight:1.7}}>空欄なら未決済として出力します。口座を入力すると全件を記録日付で決済済みとして出力します。支払方法が異なる場合は空欄で出力し、freeeで決済を登録してください。</p>
+        {rows.map(e=><div key={e.id} style={{borderTop:'1px solid var(--border)',marginTop:16,paddingTop:12}}>
+          <p style={{marginBottom:8,overflowWrap:'anywhere'}}>{e.date} ／ {e.payee || e.category} ／ {e.amount.toLocaleString()}円</p>
+          <label>勘定科目<input aria-label={'CSV勘定科目 '+e.id} value={exportSettings[e.id]?.subject || ''} onChange={v=>setExportSettings(prev=>({...prev,[e.id]:{...prev[e.id],subject:v.target.value}}))}/></label>
+          <label>税区分<input aria-label={'CSV税区分 '+e.id} placeholder="freee上の税区分名を入力" value={exportSettings[e.id]?.tax || ''} onChange={v=>setExportSettings(prev=>({...prev,[e.id]:{...prev[e.id],tax:v.target.value}}))}/></label>
+        </div>)}
+        <p style={{fontSize:14,lineHeight:1.7,margin:'12px 0'}}>同じ経費を再インポートすると重複登録されます。freeeの「取引データのインポート」で読み込んでください。</p>
+        <button class="gen-btn" disabled={!rows.length || !!loadError} onClick={exportCSV}>確認してCSVをダウンロード</button>
+        <p role="status" style={{marginTop:10}}>{exportError}</p>
+        <button class="add-btn" style={{marginTop:10,padding:12}} onClick={()=>setExportOpen(false)}>出力設定を閉じる</button>
+      </div>}
     </div>
     <h3 class="section-title">経費一覧</h3>
     {!rows.length && <p style={{padding:20,color:'var(--muted2)'}}>この期間・分類の経費はありません。</p>}
