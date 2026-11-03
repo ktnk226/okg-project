@@ -24,6 +24,10 @@
     }
     html, body { height: 100%; background: var(--bg); color: var(--text); font-family: var(--font-body); overflow-x: hidden; font-size: 16px; }
     
+    #expense-form { scroll-margin-top: 100px; }
+    #expense-form fieldset:disabled { opacity: .65; }
+    button:disabled { cursor: wait; opacity: .6; }
+
     /* APP LAYOUT */
     .app-shell { display: flex; height: 100vh; width: 100vw; overflow: hidden; }
     .main-content { flex: 1; display: flex; flex-direction: column; overflow-y: auto; padding-bottom: 110px; }
@@ -406,7 +410,8 @@ const SK = {
   db: 'delivery_log_vault_v13',
   currentDate: 'delivery_log_current_date_v13',
   goals: 'delivery_log_periodic_goals_v13',
-  memos: 'delivery_log_inbox_memos_v13'
+  memos: 'delivery_log_inbox_memos_v13',
+  expenses: 'delivery_log_expenses_v1'
 };
 
 const PLATFORMS = [
@@ -491,8 +496,176 @@ function getYearWeekStr(dateStr) {
   return `${year}-W${String(weekNum).padStart(2,'0')}`;
 }
 
+const EXPENSE_CATEGORIES = ['燃料費', '車両整備・修理', '消耗品', '通信費', '保険料', '駐車・通行料', 'その他'];
+function expenseToday() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+function validExpenseDate(value) {
+  return typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value) && !isNaN(Date.parse(value)) && new Date(value).toISOString().slice(0,10) === value;
+}
+function cleanExpenses(items) {
+  if (!Array.isArray(items)) throw new Error('経費形式');
+  const ids = new Set();
+  return items.map(e => {
+    if (!e || typeof e.id !== 'string' || !e.id || ids.has(e.id) || !validExpenseDate(e.date) || !Number.isSafeInteger(e.amount) || e.amount <= 0 || e.amount > 999999999 || !EXPENSE_CATEGORIES.includes(e.category) || typeof e.payee !== 'string' || typeof e.memo !== 'string') throw new Error('経費形式');
+    ids.add(e.id);
+    return {id:e.id, date:e.date, amount:e.amount, category:e.category, payee:e.payee, memo:e.memo};
+  });
+}
+function parseExpenseReceipt(raw) {
+  const text = raw.normalize('NFKC');
+  const lines = text.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+  const match = text.match(/(20\d{2})\s*[年\/.-]\s*(\d{1,2})\s*[月\/.-]\s*(\d{1,2})/);
+  const date = match ? `${match[1]}-${match[2].padStart(2,'0')}-${match[3].padStart(2,'0')}` : '';
+  const totals = lines.filter(s => /合\s*計|総\s*額|お\s*支\s*払\s*い?\s*金\s*額|TOTAL/i.test(s) && !/小\s*計|税|対象/.test(s));
+  const values = totals.flatMap(s => {
+    const tail = s.replace(/^.*?(?:合\s*計|総\s*額|お\s*支\s*払\s*い?\s*金\s*額|TOTAL)/i, '');
+    const m = tail.match(/[¥￥]?\s*(\d[\d,]*)\s*円?/);
+    return m ? [Number(m[1].replace(/,/g,''))] : [];
+  }).filter(n => Number.isSafeInteger(n) && n > 0 && n <= 999999999);
+  const unique = [...new Set(values)];
+  return {date:validExpenseDate(date) ? date : '', amount:unique.length === 1 ? String(unique[0]) : ''};
+}
+let expenseOCRLoader;
+function loadExpenseOCR() {
+  if (window.Tesseract) return Promise.resolve(window.Tesseract);
+  if (!expenseOCRLoader) expenseOCRLoader = new Promise((resolve, reject) => {
+    const script = document.createElement('script');
+    const timer = setTimeout(() => {script.remove(); expenseOCRLoader = null; reject(new Error('読込タイムアウト'));}, 30000);
+    script.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@6.0.1/dist/tesseract.min.js';
+    script.onload = () => {clearTimeout(timer); resolve(window.Tesseract);};
+    script.onerror = () => {clearTimeout(timer); script.remove(); expenseOCRLoader = null; reject(new Error('読込失敗'));};
+    document.head.appendChild(script);
+  });
+  return expenseOCRLoader;
+}
+async function expenseImageCanvas(file) {
+  const url = URL.createObjectURL(file);
+  try {
+    const img = new Image();
+    await new Promise((resolve,reject) => {img.onload=resolve; img.onerror=reject; img.src=url;});
+    const scale = Math.min(1, 2200 / Math.max(img.naturalWidth,img.naturalHeight));
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.max(1,Math.round(img.naturalWidth*scale)); canvas.height = Math.max(1,Math.round(img.naturalHeight*scale));
+    const ctx = canvas.getContext('2d'); ctx.fillStyle='#fff'; ctx.fillRect(0,0,canvas.width,canvas.height); ctx.drawImage(img,0,0,canvas.width,canvas.height);
+    return canvas;
+  } finally {URL.revokeObjectURL(url);}
+}
+function ExpenseView({expenses, onSave, loadError}) {
+  const empty = () => ({id:'',date:expenseToday(),amount:'',category:'その他',payee:'',memo:''});
+  const [form,setForm] = useState(empty);
+  const [mode,setMode] = useState('month');
+  const [month,setMonth] = useState(() => expenseToday().slice(0,7));
+  const [year,setYear] = useState(() => expenseToday().slice(0,4));
+  const [category,setCategory] = useState('すべて');
+  const [busy,setBusy] = useState(false);
+  const [status,setStatus] = useState('');
+  const [raw,setRaw] = useState('');
+  const lock = React.useRef(false);
+  const field = (key,value) => setForm(prev => ({...prev,[key]:value}));
+  const rows = expenses.filter(e => (mode === 'all' || e.date.startsWith(mode === 'month' ? month : year)) && (category === 'すべて' || e.category === category)).sort((a,b)=>b.date.localeCompare(a.date));
+  const total = rows.reduce((sum,e)=>sum+e.amount,0);
+  const reset = () => {setForm(empty()); setRaw(''); setStatus('');};
+  const save = event => {
+    event.preventDefault();
+    if (busy || loadError) return;
+    const item = {...form, id:form.id || (window.crypto?.randomUUID ? window.crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`), amount:Number(form.amount)};
+    try {cleanExpenses([item]);} catch {setStatus('日付と1〜999,999,999円の整数金額を確認してください。'); return;}
+    if (form.id && !expenses.some(e=>e.id===form.id)) {setStatus('編集中の記録が見つかりません。「入力をクリア」して再入力してください。'); return;}
+    const next = form.id ? expenses.map(e=>e.id===form.id ? item : e) : [...expenses,item];
+    if (onSave(next)) {reset(); setMonth(item.date.slice(0,7)); setYear(item.date.slice(0,4)); setCategory('すべて'); setStatus('経費を保存しました。');}
+  };
+  const scan = async event => {
+    const file = event.target.files?.[0]; event.target.value='';
+    if (!file || lock.current) return;
+    if (file.size > 25*1024*1024) {setStatus('写真は25MB以下を選んでください。');return;}
+    lock.current=true; setBusy(true); setRaw(''); setStatus('読み取りを準備しています…');
+    let worker, canvas, timer, finished = false;
+    try {
+      const task = async () => {
+        const engine = await loadExpenseOCR();
+        if (finished) return;
+        canvas = await expenseImageCanvas(file);
+        if (finished) {canvas.width=0;canvas.height=0;return;}
+        worker = await engine.createWorker('jpn+eng', 1, {
+          workerPath:'https://cdn.jsdelivr.net/npm/tesseract.js@6.0.1/dist/worker.min.js',
+          corePath:'https://cdn.jsdelivr.net/npm/tesseract.js-core@6.0.0',
+          logger:m=>{if(!finished) setStatus(m.status==='recognizing text' ? `読み取り中… ${Math.round(m.progress*100)}%` : '読み取り用データを準備しています…');}
+        });
+        if (finished) {await worker.terminate();return;}
+        return worker.recognize(canvas);
+      };
+      const result = await Promise.race([task(),new Promise((_,reject)=>{timer=setTimeout(()=>reject(new Error('timeout')),120000);})]);
+      const text = result?.data?.text || '';
+      setRaw(text);
+      const parsed = parseExpenseReceipt(text);
+      // Never retain a previous receipt's date/amount when recognition misses them.
+      setForm(prev=>({...prev,date:parsed.date,amount:parsed.amount}));
+      setStatus(text.trim() ? '読み取りました。日付・合計金額を確認し、支払先・分類などを入力して保存してください。空欄は手入力してください。' : '文字を読み取れませんでした。撮り直すか手入力してください。');
+    } catch {setStatus('写真を読み取れませんでした。通信や画像形式を確認して再試行するか、手入力してください。');}
+    finally {finished=true; clearTimeout(timer); lock.current=false; if(worker) await worker.terminate().catch(()=>{}); if(canvas){canvas.width=0;canvas.height=0;} setBusy(false);}
+  };
+  return <>
+    <h2 class="section-title">🧾 経費の記録・集計</h2>
+    {loadError && <p role="alert">{loadError}</p>}
+    <form class="card" onSubmit={save} id="expense-form">
+      <h3 style={{marginBottom:16}}>{form.id ? '経費を編集' : '経費を追加'}</h3>
+      <fieldset disabled={busy || !!loadError} style={{border:0,minWidth:0}}>
+        <div class="grid-2" style={{marginBottom:12}}>
+          <label class="add-btn" style={{textAlign:'center',fontSize:16}}>📷 撮影する<input aria-label="レシートを撮影" type="file" accept="image/*" capture="environment" onChange={scan} style={{display:'none'}} /></label>
+          <label class="add-btn" style={{textAlign:'center',fontSize:16}}>写真を選ぶ<input aria-label="レシート写真を選択" type="file" accept="image/*" onChange={scan} style={{display:'none'}} /></label>
+        </div>
+        <p style={{color:'var(--muted2)',fontSize:14,marginBottom:16}}>写真は端末内で読み取り、保存・送信しません。初回は読み取り用データの取得に時間がかかります。</p>
+        <div class="grid-2" style={{marginBottom:12}}>
+          <label>日付<input aria-label="経費の日付" type="date" required value={form.date} onChange={e=>field('date',e.target.value)} /></label>
+          <label>金額（円）<input aria-label="経費の金額" type="number" inputMode="numeric" min="1" max="999999999" step="1" required value={form.amount} onChange={e=>field('amount',e.target.value)} /></label>
+        </div>
+        <label>分類<select aria-label="経費の分類" value={form.category} onChange={e=>field('category',e.target.value)}>{EXPENSE_CATEGORIES.map(c=><option key={c}>{c}</option>)}</select></label>
+        <label>支払先<input aria-label="経費の支払先" maxLength="200" placeholder="店舗名など" value={form.payee} onChange={e=>field('payee',e.target.value)} /></label>
+        <label>メモ<textarea aria-label="経費のメモ" maxLength="2000" rows="2" value={form.memo} onChange={e=>field('memo',e.target.value)} /></label>
+        <button class="gen-btn" type="submit" style={{marginTop:12}}>{form.id ? '変更を保存' : '経費を保存'}</button>
+        <button class="add-btn" type="button" style={{marginTop:8,padding:12}} onClick={reset}>{form.id ? '編集をキャンセル' : '入力をクリア'}</button>
+      </fieldset>
+      <p role="status" style={{lineHeight:1.7,marginTop:12}}>{status}</p>
+      {raw && <details style={{marginTop:12}}><summary>読み取った文字を確認</summary><pre style={{whiteSpace:'pre-wrap',overflowWrap:'anywhere',fontSize:14,marginTop:12}}>{raw}</pre></details>}
+    </form>
+    <div class="card">
+      <h3 style={{marginBottom:12}}>経費の集計</h3>
+      <div class="grid-2">
+        <label>集計期間<select aria-label="経費の集計期間" value={mode} onChange={e=>setMode(e.target.value)}><option value="month">月別</option><option value="year">年別</option><option value="all">全期間</option></select></label>
+        {mode==='month' && <label>対象月<input aria-label="経費の対象月" type="month" value={month} onChange={e=>setMonth(e.target.value)} /></label>}
+        {mode==='year' && <label>対象年<input aria-label="経費の対象年" type="number" min="2000" max="9999" value={year} onChange={e=>setYear(e.target.value)} /></label>}
+      </div>
+      <label>分類で絞り込み<select aria-label="経費の絞り込み" value={category} onChange={e=>setCategory(e.target.value)}>{['すべて',...EXPENSE_CATEGORIES].map(c=><option key={c}>{c}</option>)}</select></label>
+      <p style={{fontSize:28,color:'var(--accent)',fontWeight:900,margin:'16px 0'}} data-testid="expense-total">{total.toLocaleString()} 円 <small style={{fontSize:16}}>／ {rows.length}件</small></p>
+      {EXPENSE_CATEGORIES.map(c=>{const list=rows.filter(e=>e.category===c);return list.length>0 && <div key={c} style={{display:'flex',justifyContent:'space-between',gap:12,padding:'8px 0',borderTop:'1px solid var(--border)'}}><span>{c}</span><strong>{list.reduce((s,e)=>s+e.amount,0).toLocaleString()} 円</strong></div>;})}
+    </div>
+    <h3 class="section-title">経費一覧</h3>
+    {!rows.length && <p style={{padding:20,color:'var(--muted2)'}}>この期間・分類の経費はありません。</p>}
+    {rows.map(e=><div class="card" key={e.id} style={{overflowWrap:'anywhere'}}>
+      <div style={{display:'flex',justifyContent:'space-between',gap:12}}><span>{e.date}<br/>{e.category}</span><strong style={{fontSize:22}}>{e.amount.toLocaleString()} 円</strong></div>
+      {e.payee && <p style={{marginTop:10}}>{e.payee}</p>}{e.memo && <p style={{whiteSpace:'pre-wrap',marginTop:8,color:'var(--muted2)'}}>{e.memo}</p>}
+      <div class="grid-2" style={{marginTop:12}}>
+        <button class="stamp-btn secondary" disabled={busy} onClick={()=>{setForm({...e,amount:String(e.amount)});setRaw('');setStatus('');document.getElementById('expense-form').scrollIntoView({behavior:'smooth',block:'start'});}}>編集</button>
+        <button class="stamp-btn secondary" disabled={busy || !!loadError} onClick={()=>{if(confirm(`${e.date} ${e.amount.toLocaleString()}円の経費を削除しますか？`) && onSave(expenses.filter(x=>x.id!==e.id))) {if(form.id===e.id) reset();setStatus('削除しました。');}}}>削除</button>
+      </div>
+    </div>)}
+  </>;
+}
+
 /* ────────────────── MAIN APP ────────────────── */
 function App() {
+  const [expenseState, setExpenseState] = useState(() => {
+    try { return {items: cleanExpenses(JSON.parse(localStorage.getItem(SK.expenses) || '[]')), error: ''}; }
+    catch { return {items: [], error: '経費データを読み込めません。既存データ保護のため保存を停止しています。バックアップから復元してください。'}; }
+  });
+  const expenses = expenseState.items;
+  const saveExpenses = (items) => {
+    if (expenseState.error) { alert(expenseState.error); return false; }
+    try { const clean = cleanExpenses(items); localStorage.setItem(SK.expenses, JSON.stringify(clean)); setExpenseState({items: clean, error: ''}); setIsDirty(true); return true; }
+    catch { alert('経費を保存できませんでした。入力内容を残しています。'); return false; }
+  };
   const [vault, setVault] = useState(loadInitialVault);
   const [date, setDate] = useState(loadInitialDate);
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -870,12 +1043,14 @@ function App() {
   }, [vault, calYear, calMonth]);
 
   const saveToiCloudJSON = () => {
-    const backup = { vault, periodicGoals, memos, version: 13 };
+    if (expenseState.error) { alert(expenseState.error); return; }
+    const backup = { vault, periodicGoals, memos, expenses, version: 14 };
     const dataStr = JSON.stringify(backup, null, 2);
     const blob = new Blob([dataStr], { type: "application/json" });
     const url = URL.createObjectURL(blob); const link = document.createElement("a");
     link.setAttribute("href", url); link.setAttribute("download", "delilog_master_backup.json");
     document.body.appendChild(link); link.click(); document.body.removeChild(link);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
     setIsDirty(false);
   };
 
@@ -885,6 +1060,11 @@ function App() {
     reader.onload = (event) => {
       try {
         const data = JSON.parse(event.target.result);
+        const restoredExpenses = data.vault && Object.prototype.hasOwnProperty.call(data, 'expenses') ? cleanExpenses(data.expenses) : null;
+        if (restoredExpenses !== null) {
+          localStorage.setItem(SK.expenses, JSON.stringify(restoredExpenses));
+          setExpenseState({items: restoredExpenses, error: ''});
+        }
         if (data.vault) {
           setVault(data.vault);
           if (data.periodicGoals) setPeriodicGoals(data.periodicGoals);
@@ -892,7 +1072,7 @@ function App() {
         } else {
           setVault(data);
         }
-        setIsDirty(false); alert("iCloudバックアップから同期しました！");
+        setIsDirty(restoredExpenses === null && expenses.length > 0); alert(restoredExpenses === null ? "復元しました。経費を含まない旧バックアップのため、現在の経費は保持しました。" : "バックアップから復元しました！");
       } catch (err) { alert("同期に失敗しました。形式をご確認ください。"); }
     };
     reader.readAsText(file); e.target.value = '';
@@ -1012,6 +1192,7 @@ function App() {
         <nav class="nav-menu">
           <button class={`nav-item ${activeTab === 'dashboard' ? 'active' : ''}`} onClick={() => setActiveTab('dashboard')}>📊 ホーム</button>
           <button class={`nav-item ${activeTab === 'memos' ? 'active' : ''}`} onClick={() => setActiveTab('memos')}>📝 メモ / Inbox</button>
+          <button class={`nav-item ${activeTab === 'expenses' ? 'active' : ''}`} onClick={() => setActiveTab('expenses')}>🧾 経費</button>
           <button class={`nav-item ${activeTab === 'calendar' ? 'active' : ''}`} onClick={() => setActiveTab('calendar')}>📅 カレンダー</button>
           <button class={`nav-item ${activeTab === 'settings' ? 'active' : ''}`} onClick={() => setActiveTab('settings')}>⚙️ 設定・同期</button>
         </nav>
@@ -1469,12 +1650,16 @@ function App() {
           </div>
         </div>
 
+        <div class={`view-container ${activeTab === 'expenses' ? 'active' : ''}`}>
+          <ExpenseView expenses={expenses} onSave={saveExpenses} loadError={expenseState.error} />
+        </div>
+
         {/* ── TAB 4: SETTINGS ── */}
         <div class={`view-container ${activeTab === 'settings' ? 'active' : ''}`}>
           <div class="section-title">☁️ iCloud Drive バックアップ / 同期</div>
           <div class="card" style={{borderColor:'var(--blue)', background:'rgba(41,121,255,0.03)'}}>
             <p style={{fontSize:'14px', color:'var(--muted2)', marginBottom:'14px'}}>
-              稼働ログ、メモ、目標設定を含む全データを一括で保存・復元します。
+              稼働ログ、メモ、目標設定、経費を含む全データをJSONファイルで保存・復元します。写真は含みません。
             </p>
             <div class="grid-2">
               <button class="gen-btn" style={{background:'var(--blue)'}} onClick={saveToiCloudJSON}>💾 iCloudへ完全保存</button>
@@ -1496,6 +1681,9 @@ function App() {
           <button class={`tab-btn ${activeTab === 'memos' ? 'active' : ''}`} onClick={() => setActiveTab('memos')}>
             <svg class="nav-icon" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg><span>メモ</span>
           </button>
+          <button class={`tab-btn ${activeTab === 'expenses' ? 'active' : ''}`} onClick={() => setActiveTab('expenses')}>
+            <svg class="nav-icon" viewBox="0 0 24 24"><path d="M5 3h14v18l-3-2-4 2-4-2-3 2zM8 7h8M8 11h8M8 15h4"/></svg><span>経費</span>
+          </button>
           <button class={`tab-btn ${activeTab === 'calendar' ? 'active' : ''}`} onClick={() => setActiveTab('calendar')}>
             <svg class="nav-icon" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="18" y2="10"/></svg><span>カレンダー</span>
           </button>
@@ -1516,3 +1704,4 @@ ReactDOM.createRoot(document.getElementById('root')).render(<App />);
 </script>
 </body>
 </html>
+
