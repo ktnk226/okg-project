@@ -415,6 +415,17 @@
       .platform-overview-amount { font-size: 26px; }
       .platform-overview-stats { font-size: 16px; }
     }
+    .planner { line-height:1.8; }
+    .planner-home { padding:16px; max-width:1000px; width:100%; margin:auto; }
+    .planner h2, .planner h3, .planner h4 { margin:12px 0; }
+    .planner p, .planner label { margin:8px 0; }
+    .planner button:not(.gen-btn):not(.del-btn) {padding:12px;min-height:44px;border:1px solid var(--border2);border-radius:8px;background:var(--surface2);color:var(--text);font-size:16px;cursor:pointer;}
+    .planner input,.planner select {min-width:0;max-width:100%;}
+    .planner .card {min-width:0;overflow-wrap:anywhere;}
+    .planner-results {display:grid;grid-template-columns:1fr;gap:12px;}
+    .planner-results .card {margin-bottom:0;}
+    @media(min-width:1100px){.planner.view-container {max-width:1200px;} .planner-results{grid-template-columns:repeat(3,minmax(0,1fr));}}
+    @media(max-width:480px){.planner .grid-3{grid-template-columns:1fr;} .planner .grid-2{grid-template-columns:1fr;} }
   </style>
 </head>
 <body>
@@ -727,6 +738,143 @@ function ExpenseView({expenses, onSave, loadError}) {
 }
 
 /* ────────────────── MAIN APP ────────────────── */
+// Planning is deliberately separate from accounting records.
+const PLAN_KEY = 'delivery_log_planning_v15';
+const pn = v => Math.max(0, Number(v) || 0);
+function pdate(s, offset=0) { const d=new Date(s+'T12:00:00'); d.setDate(d.getDate()+offset); return formatDateToParam(d); }
+function pdays(a,b) { const out=[]; for(let d=a;d<=b;d=pdate(d,1)) { out.push(d); if(out.length>370) throw Error('期間が長すぎます'); } return out; }
+function prange(date,kind) {
+  if(kind==='month') {const [y,m]=date.split('-').map(Number);return [date.slice(0,7)+'-01',formatDateToParam(new Date(y,m,0,12))];}
+  const wd=new Date(date+'T12:00:00').getDay(); const mon=pdate(date,-((wd+6)%7));return [mon,pdate(mon,6)];
+}
+function pdefault() { return {quests:[],days:{},models:['閑散期','通常期','繁忙期'].map(name=>({name,u:'',d:'',uph:''})),model:1,calc:{u:'',d:'',uph:'',company:'u',share:100},scenarios:[0,5,10]}; }
+function pvalidate(p) {
+  const obj=v=>v&&typeof v==='object'&&!Array.isArray(v);
+  const number=v=>v===''||(Number.isFinite(Number(v))&&Number(v)>=0);
+  const day=v=>/^\d{4}-\d{2}-\d{2}$/.test(v)&&pdate(v)===v;
+  if(!obj(p)||!Array.isArray(p.quests)||!obj(p.days)||!Array.isArray(p.models)||p.models.length!==3||!obj(p.calc)||!Array.isArray(p.scenarios)||p.scenarios.length!==3) throw Error('計画データの形式が違います');
+  if(!['u','d','both'].includes(p.calc.company)||!['u','d','uph','share'].every(k=>number(p.calc[k]))||pn(p.calc.share)>100||!Number.isInteger(p.model)||p.model<0||p.model>2||!p.scenarios.every(v=>number(v)&&Number.isInteger(Number(v)))||Number(p.scenarios[0])!==0) throw Error('計算条件が不正です');
+  if(!p.models.every(m=>obj(m)&&typeof m.name==='string'&&['u','d','uph'].every(k=>number(m[k])))) throw Error('モデルが不正です');
+  const ids=new Set();
+  for(const q of p.quests) {
+    if(!obj(q)||typeof q.id!=='string'||ids.has(q.id)||!day(q.start)||!day(q.end)||q.end<q.start||pdays(q.start,q.end).length>4||!['n','base','extra'].includes(q.aim)||!['n','base','extra'].includes(q.finish)||!['n','base','extra','miss'].includes(q.status)||!['count','base','extra','adjust'].every(k=>number(q[k]))||pn(q.count)<10||pn(q.count)>120||pn(q.count)%10||!Array.isArray(q.links)) throw Error('クエスト条件が不正です');
+    ids.add(q.id);
+    for(const l of q.links) if(!obj(l)||!day(l.date)||!number(l.amount)) throw Error('報酬紐付けが不正です');
+  }
+  for(const [d,v] of Object.entries(p.days)) if(!day(d)||!obj(v)||!['auto','off','amt','cnt'].includes(v.mode)||!number(v.value)) throw Error('日別計画が不正です');
+  const ordered=[...p.quests].sort((a,b)=>a.start.localeCompare(b.start));
+  for(let i=1;i<ordered.length;i++) if(ordered[i].start<=ordered[i-1].end) throw Error('日跨ぎクエストの期間が重複しています');
+  return p;
+}
+function pload() { try {const raw=localStorage.getItem(PLAN_KEY); return {data:raw?pvalidate(JSON.parse(raw)):pdefault(),error:''};} catch(e){return {data:pdefault(),error:'計画データを読み込めません。バックアップから復元してください。'};} }
+function pday(vault,date) {
+  const day=vault[date]||{}, s=(day.sets||[]).slice(-1)[0]||{};
+  const pf=k=>({amt:pn(s[k+'_cum']),cnt:pn(s[k+'_cnt_cum']),que:pn(s[k+'_que_cum'])});
+  const u=pf('u'),d=pf('d'),all=['u','d','r','m'].map(pf);
+  return {u,d,real:all.reduce((a,x)=>a+x.amt,0),cnt:all.reduce((a,x)=>a+x.cnt,0),que:all.reduce((a,x)=>a+x.que,0),hours:(day.sets||[]).reduce((a,x)=>a+(calcDuration(x.start,x.end)?.total||0),0)};
+}
+function preward(q,c) {return c<pn(q.count)?0:pn(q.base)+(c>=pn(q.count)+10?pn(q.extra):0);}
+function pprogress(vault,q,date,extraU=0) {return Math.max(0,pdays(q.start,q.end).filter(d=>d<=date).reduce((a,d)=>a+pday(vault,d).u.cnt,0)-pn(q.adjust)+(date>=q.start&&date<=q.end?extraU:0));}
+function pbudget(q) {if(q.status==='miss'||q.aim==='n')return 0;const stage=q.status==='n'?q.aim:q.status;return pn(q.base)+(stage==='extra'?pn(q.extra):0);}
+function pallocation(q,date) {if(date<q.start||date>q.end)return 0;const days=pdays(q.start,q.end),n=pbudget(q),part=Math.floor(n/days.length);return date===q.end?n-part*(days.length-1):part;}
+function plinkCheck(p,vault) {
+  const sums={};for(const q of p.quests)for(const l of q.links)sums[l.date]=(sums[l.date]||0)+pn(l.amount);
+  for(const [d,n] of Object.entries(sums))if(n>pday(vault,d).u.que) return d+'：紐付け額がUberの記録済みクエスト報酬を超えています';return '';
+}
+function pamount(vault,p,date) {
+  const day=pday(vault,date),links=p.quests.flatMap(q=>q.links).filter(l=>l.date===date).reduce((a,l)=>a+pn(l.amount),0);
+  return day.real+day.que-links+p.quests.reduce((a,q)=>a+pallocation(q,date),0);
+}
+function pmix(c,n) {const u=c.company==='u'?n:c.company==='d'?0:Math.round(n*pn(c.share)/100);return {u,d:n-u,amt:u*pn(c.u)+(n-u)*pn(c.d)};}
+function pready(c) {return (c.company==='u'?pn(c.u)>0:c.company==='d'?pn(c.d)>0:(pn(c.share)===0||pn(c.u)>0)&&(pn(c.share)===100||pn(c.d)>0));}
+function punit(c) {return c.company==='u'?pn(c.u):c.company==='d'?pn(c.d):pn(c.u)*pn(c.share)/100+pn(c.d)*(1-pn(c.share)/100);}
+function pneed(c,amt) {
+  if(amt<=0)return 0;if(!pready(c))return null;
+  let lo=0,hi=Math.ceil(amt/Math.min(...[c.company!=='d'?pn(c.u):Infinity,c.company!=='u'?pn(c.d):Infinity].filter(n=>n>0)))+2;
+  // Rounding the company split may briefly flatten earnings, but never reduces it with positive fares.
+  while(lo<hi){let m=Math.floor((lo+hi)/2);if(pmix(c,m).amt>=amt)hi=m;else lo=m+1;}return lo;
+}
+function pgoal(goals,date,kind){const key=kind==='week'?'W-'+getYearWeekStr(date):'M-'+date.slice(0,7);const v=goals[key];return pn(typeof v==='object'?v?.amt:v);}
+function pfixed(p,date) {const v=p.days[date];if(v?.mode==='amt')return pn(v.value);if(v?.mode==='cnt')return pmix(p.calc,pn(v.value)).amt+p.quests.reduce((a,q)=>a+pallocation(q,date),0);return null;}
+function pdistribute(vault,goals,p,date,kind,includeToday,extra=0) {
+  const [start,end]=prange(date,kind),goal=pgoal(goals,date,kind);
+  const prior=pdays(start,end).filter(d=>includeToday?d<date:d<=date).reduce((a,d)=>a+pamount(vault,p,d),0)+extra;
+  const future=pdays(start,end).filter(d=>(includeToday?d>=date:d>date)&&p.days[d]?.mode!=='off');
+  const fixed=future.filter(d=>pfixed(p,d)!==null),free=future.filter(d=>pfixed(p,d)===null);
+  const remain=Math.max(0,goal-prior),reserved=fixed.reduce((a,d)=>a+pfixed(p,d),0),daily=free.length?Math.ceil(Math.max(0,remain-reserved)/free.length):0;
+  return {goal,remain,daily,future,fixed,free,unallocated:free.length===0?Math.max(0,remain-reserved):0,amountFor:d=>pfixed(p,d)??daily};
+}
+function pscenario(vault,p,date,n) {
+  const mix=pmix(p.calc,n);
+  const next={...p,quests:p.quests.map(q=>{
+    if(date<q.start||date>q.end||(q.finish==='n'&&date!==q.end))return q;
+    const c=pprogress(vault,q,date,mix.u),r=preward(q,c);
+    return {...q,status:r===0?'miss':c>=pn(q.count)+10?'extra':'base'};
+  })};
+  return {mix,p:next,landing:pamount(vault,next,date)+mix.amt};
+}
+function psolve(vault,p,date,target) {
+  if(pscenario(vault,p,date,0).landing>=target)return 0;
+  if(!pready(p.calc)||punit(p.calc)<=0)return null;
+  let hi=1;while(hi<1000000&&pscenario(vault,p,date,hi).landing<target)hi*=2;
+  if(pscenario(vault,p,date,hi).landing<target)return null;
+  let lo=0;while(lo<hi){let m=Math.floor((lo+hi)/2);if(pscenario(vault,p,date,m).landing>=target)hi=m;else lo=m+1;}return lo;
+}
+function psummary(vault,goals,p,date) {
+  const w=pdistribute(vault,goals,p,date,'week',true),m=pdistribute(vault,goals,p,date,'month',true),manual=pfixed(p,date),g=goals['D-'+date],old=pn(typeof g==='object'?g?.amt:g);
+  const target=p.days[date]?.mode==='off'?0:manual??(old||Math.max(w.goal?w.amountFor(date):0,m.goal?m.amountFor(date):0));
+  const actual=pamount(vault,p,date),remain=Math.max(0,target-actual),need=psolve(vault,p,date,target);
+  return {w,m,target,actual,remain,need,manual:manual!==null||old>0};
+}
+function ptime(cnt,uph){if(cnt===null||pn(uph)<=0)return '未設定';const min=Math.ceil(cnt/pn(uph)*60);return Math.floor(min/60)+'時間'+min%60+'分';}
+function Planner({view,vault,goals,date,p,onChange,navigate,error}) {
+  const [mode,setMode]=useState('cnt'),[money,setMoney]=useState(''),[editDate,setEditDate]=useState(date);
+  const [questPart,setQuestPart]=useState('front');
+  const [notice,setNotice]=useState('');
+  useEffect(()=>setEditDate(date),[date]);
+  const change=next=>{try{pvalidate(next);onChange(next);setNotice('');}catch(e){setNotice(e.message);}};
+  const calc=(k,v)=>change({...p,calc:{...p.calc,[k]:v}});
+  const day=pday(vault,date),sum=psummary(vault,goals,p,date),linkError=plinkCheck(p,vault),blocked=error||linkError;
+  const active=p.quests.filter(q=>date>=q.start&&date<=q.end);
+  const yen=n=>Math.round(n).toLocaleString()+'円';
+  const field=(label,value,onChange,opts={})=><label>{label}<input type="number" min="0" step="any" value={value} onChange={e=>onChange(e.target.value)} {...opts}/></label>;
+  const qchange=(id,k,v)=>change({...p,quests:p.quests.map(q=>q.id===id?{...q,[k]:v}:q)});
+  const dayChange=(k,v)=>change({...p,days:{...p.days,[editDate]:{mode:'auto',value:'',...p.days[editDate],[k]:v}}});
+  const addQuest=()=>{const [mon]=prange(date,'week');const start=questPart==='front'?mon:pdate(mon,4),end=pdate(start,questPart==='front'?3:2);change({...p,quests:[...p.quests,{id:start,start,end,count:120,base:'',extra:'',adjust:0,aim:'base',finish:'n',status:'n',links:[]}]});};
+  const listDates=pdays(date,prange(date,'month')[1]>prange(date,'week')[1]?prange(date,'month')[1]:prange(date,'week')[1]);
+  const resultCard=(n,i)=>{
+    const mix=pmix(p.calc,n),qdata=active.map(q=>({q,c:pprogress(vault,q,date,mix.u)}));
+    const simulated=pscenario(vault,p,date,n).p;
+    const qDelta=simulated.quests.reduce((a,q)=>a+pallocation(q,date),0)-p.quests.reduce((a,q)=>a+pallocation(q,date),0);
+    const ds=pday(vault,date),hours=pn(p.calc.uph)>0?ds.hours+n/pn(p.calc.uph):null;
+    return <div className="card" key={i}><h3>{n===0?'今終了':`あと${n}件`}</h3>{mode==='cnt'&&i>0&&field('追加件数',p.scenarios[i],v=>change({...p,scenarios:p.scenarios.map((x,j)=>i===j?v:x)}),{step:1})}
+      <p>Uber {mix.u}件 ／ 出前館 {mix.d}件</p><p>通常売上 ＋{yen(mix.amt)}</p><strong>今日の計画着地 {yen(pamount(vault,simulated,date)+mix.amt)}</strong>
+      <p>追加時間 {ptime(n,p.calc.uph)}</p><p>通常平均単価 {ds.cnt+n?yen((ds.real+mix.amt)/(ds.cnt+n)):'—'}</p><p>着地時給（計画配分込） {hours>0?yen((pamount(vault,simulated,date)+mix.amt)/hours):'—'}</p>
+      {qdata.map(({q,c})=><p key={q.id}>Uberクエスト {c}件 ／ 基本まで{Math.max(0,pn(q.count)-c)}件 ／ 追加まで{Math.max(0,pn(q.count)+10-c)}件<br/>ここで期間終了なら報酬 {yen(preward(q,c))}<br/>{(()=>{const days=pdays(q.start,q.end).filter(d=>d>date&&p.days[d]?.mode!=='off');const remain=Math.max(0,pn(q.count)+(q.aim==='extra'?10:0)-c);return days.length?'期限まで残り'+days.length+'稼働日：Uber '+Math.ceil(remain/days.length)+'件/日（全体UPH換算の参考 '+ptime(Math.ceil(remain/days.length),p.calc.uph)+'）':remain?'期限内に残りUber '+remain+'件':'狙う回数に到達';})()}</p>)}
+      {['week','month'].map(kind=>{const r=pdistribute(vault,goals,simulated,date,kind,false,mix.amt);return <div key={kind}><h4>{kind==='week'?'週間':'月間'}：明日以降</h4>{r.goal?<><p>残り{yen(r.remain)} ／ 稼働予定{r.future.length}日</p>{r.unallocated>0&&<p>未配分 {yen(r.unallocated)}</p>}{r.future.map(d=>{const amt=r.amountFor(d),alloc=simulated.quests.reduce((a,q)=>a+pallocation(q,d),0),nc=pneed(p.calc,Math.max(0,amt-alloc));return <p key={d}>{d.slice(5)}：{yen(amt)}・{nc===null?'件数未設定':nc+'件'}・{ptime(nc,p.calc.uph)}</p>;})}</>:<p>目標未設定</p>}</div>;})}
+      {qDelta!==0&&<p>期間終了条件による当日配分差 {yen(qDelta)}</p>}
+    </div>;
+  };
+  if(!['dashboard','simulator','goals','settings'].includes(view))return null;
+  return <section className={'planner '+(view==='dashboard'?'planner-home':'view-container active')}>
+    {(view==='goals'||view==='simulator')&&<button className="gen-btn" onClick={()=>navigate('dashboard')}>← ホームへ</button>}
+    {(notice||blocked)&&<p role="alert" style={{color:'var(--yellow)'}}>{notice||blocked}</p>}
+    {view==='dashboard'&&<div className="card"><h3>今日の残り・逆算</h3><p>{date} ／ クエスト達成前提</p>{!blocked&&<><strong>あと {yen(sum.remain)}</strong><p>{sum.need===null?'単価を設定してください':sum.need+'件'} ／ {ptime(sum.need,p.calc.uph)}</p><p>今日の目標 {yen(sum.target)} {sum.manual?'（手動）':'（自動）'}</p><p>本人件数目標まであと {Math.max(0,pn(goals['D-'+date]?.cnt)-day.cnt)}件</p>{active.map(q=><p key={q.id}>Uber：{pprogress(vault,q,date)}件 ／ 狙う回数まであと{Math.max(0,pn(q.count)+(q.aim==='extra'?10:0)-pprogress(vault,q,date))}件</p>)}</>}
+      <div className="grid-2"><button className="gen-btn" onClick={()=>navigate('simulator')}>逆算を開く</button><button className="gen-btn" onClick={()=>navigate('goals')}>目標を編集</button></div></div>}
+    {view==='goals'&&<><h2>目標管理</h2><p>上の期間切替で日・週・月・年の目標を編集できます。</p><div className="card"><h3>日別の稼働予定</h3><label>対象日<input type="date" value={editDate} onChange={e=>{if(e.target.value)setEditDate(e.target.value);}}/></label><select value={p.days[editDate]?.mode||'auto'} onChange={e=>dayChange('mode',e.target.value)}><option value="auto">自動配分</option><option value="off">休み</option><option value="amt">売上を指定（配分込）</option><option value="cnt">件数を指定</option></select>{['amt','cnt'].includes(p.days[editDate]?.mode)&&field('指定値',p.days[editDate]?.value||'',v=>dayChange('value',v))}<p>件数指定は逆算の会社・単価条件を使用します。</p><details><summary>今後の予定一覧</summary>{listDates.map(d=><p key={d}><button onClick={()=>setEditDate(d)}>{d}</button> {p.days[d]?.mode||'auto'} {p.days[d]?.value||''}</p>)}</details></div>
+    <div className="card"><h3>Uber Eats 日跨ぎクエスト</h3><p>開始日の04:00〜最終営業日の翌日04:00（日本時間）。選んだ候補だけ登録します。</p><select value={questPart} onChange={e=>setQuestPart(e.target.value)}><option value="front">選択週の前半（月〜木）</option><option value="back">選択週の後半（金〜日）</option></select><button className="gen-btn" onClick={addQuest}>クエストを登録</button></div>
+    {p.quests.map(q=><div className="card" key={q.id}><h3>{q.start} 〜 {q.end}</h3><p>終了：{pdate(q.end,1)} 04:00</p><label>Uber側で選択した回数<select value={q.count} onChange={e=>qchange(q.id,'count',Number(e.target.value))}>{Array.from({length:12},(_,i)=>(i+1)*10).map(n=><option key={n} value={n}>{n}回</option>)}</select></label>{field('基本達成報酬（円）',q.base,v=>qchange(q.id,'base',v))}{field('追加10回の報酬（円）',q.extra,v=>qchange(q.id,'extra',v))}<label>狙う段階<select value={q.aim} onChange={e=>qchange(q.id,'aim',e.target.value)}><option value="n">計画に含めない／未選択</option><option value="base">基本回数まで</option><option value="extra">追加10回まで</option></select></label><p>Uber実績 {pprogress(vault,q,date)}件 ／ 計画報酬 {yen(pbudget(q))}</p>
+    {field('対象外件数（Uber累計から控除）',q.adjust,v=>qchange(q.id,'adjust',v),{step:1})}
+    <label>期間終了後の結果<select value={q.status} onChange={e=>qchange(q.id,'status',e.target.value)}><option value="n">計画中</option><option value="base">基本達成</option><option value="extra">追加達成</option><option value="miss">未達</option></select></label><details><summary>実績に入力済みの日跨ぎ報酬を紐付ける</summary><p>入力済みUberクエスト報酬のうち、このクエスト分だけを指定。計画での重複を除きます。</p>{q.links.map((l,i)=><div key={i}><input type="date" value={l.date} onChange={e=>e.target.value&&qchange(q.id,'links',q.links.map((v,j)=>i===j?{...v,date:e.target.value}:v))}/>{field('記録済み金額',l.amount,v=>qchange(q.id,'links',q.links.map((l,j)=>i===j?{...l,amount:v}:l)))}<button onClick={()=>qchange(q.id,'links',q.links.filter((_,j)=>i!==j))}>紐付け解除</button></div>)}<button onClick={()=>qchange(q.id,'links',[...q.links,{date,amount:0}])}>紐付けを追加</button></details><button className="del-btn" onClick={()=>{if(confirm('このクエスト設定を削除しますか？実績は保持します。'))change({...p,quests:p.quests.filter(v=>v.id!==q.id)});}}>設定を削除</button></div>)}</>}
+    {view==='simulator'&&<><h2>逆算シミュレーター</h2><p>{date} ／ クエスト達成前提・配分込</p><div className="card"><label>追加配達の会社<select value={p.calc.company} onChange={e=>calc('company',e.target.value)}><option value="u">Uber中心（追加はUber）</option><option value="d">出前館中心（追加は出前館）</option><option value="both">両方</option></select></label>{p.calc.company==='both'&&field('Uber件数比率（%）',p.calc.share,v=>calc('share',v),{max:100})}<div className="grid-2">{field('Uber通常単価（円）',p.calc.u,v=>calc('u',v))}{field('出前館通常単価（円）',p.calc.d,v=>calc('d',v))}</div>{field('全体UPH（件/時）',p.calc.uph,v=>calc('uph',v))}<p>今日の通常単価：Uber {day.u.cnt?yen(day.u.amt/day.u.cnt):'—'} ／ 出前館 {day.d.cnt?yen(day.d.amt/day.d.cnt):'—'}</p><button onClick={()=>change({...p,calc:{...p.calc,u:day.u.cnt?Math.round(day.u.amt/day.u.cnt):p.calc.u,d:day.d.cnt?Math.round(day.d.amt/day.d.cnt):p.calc.d}})}>この実績単価を使う</button><label>季節モデル<select value={p.model} onChange={e=>change({...p,model:Number(e.target.value)})}>{p.models.map((m,i)=><option value={i} key={i}>{m.name}</option>)}</select></label><button onClick={()=>change({...p,calc:{...p.calc,u:p.models[p.model].u,d:p.models[p.model].d,uph:p.models[p.model].uph}})}>単価・UPHの組を使う</button></div>
+    <div className="card"><h3>今日の目標 {yen(sum.target)}</h3><p>週基準 {yen(sum.w.amountFor(date))} ／ 月基準 {yen(sum.m.amountFor(date))}</p><p>計画実績 {yen(sum.actual)} ／ あと {yen(sum.remain)}</p><p>クエスト配分 {yen(active.reduce((a,q)=>a+pallocation(q,date),0))} を含む</p><button onClick={()=>navigate('goals')}>目標・稼働予定を変更</button></div>
+    <div className="card"><label>比較方法<select value={mode} onChange={e=>setMode(e.target.value)}><option value="cnt">あと何件</option><option value="amt">あと何円（配分込の目標まで）</option></select></label>{mode==='amt'&&field('今日の着地目標（空欄は今日の目標）',money,setMoney)}{active.map(q=><label key={q.id}>クエストの期間を今日で終了する想定<select value={q.finish} onChange={e=>qchange(q.id,'finish',e.target.value)}><option value="n">明日以降も継続</option><option value="base">今日で終了として比較</option></select></label>)}</div>
+    {!blocked&&(!pready(p.calc)?<p>使用する会社の通常単価を設定してください。</p>:mode==='cnt'?<div className="planner-results">{p.scenarios.map((n,i)=>resultCard(Math.floor(pn(n)),i))}</div>:(()=>{const n=psolve(vault,p,date,money===''?sum.target:pn(money));return n===null?<p>単価を設定してください。</p>:resultCard(n,0);})())}
+    <p>通常売上と配分額は計画値です。会計の実績は変更しません。</p></>}
+    {view==='settings'&&<div className="card"><h2>単価・UPHのプリセット</h2>{p.models.map((m,i)=><div key={i}><h3>{m.name}</h3><div className="grid-3">{['u','d','uph'].map((k,j)=>field(['Uber単価','出前館単価','UPH'][j],m[k],v=>change({...p,models:p.models.map((x,z)=>z===i?{...x,[k]:v}:x)})))}</div></div>)}</div>}
+  </section>;
+}
+
 function App() {
   const [expenseState, setExpenseState] = useState(() => {
     try { return {items: cleanExpenses(JSON.parse(localStorage.getItem(SK.expenses) || '[]')), error: ''}; }
@@ -741,6 +889,13 @@ function App() {
   const [vault, setVault] = useState(loadInitialVault);
   const [date, setDate] = useState(loadInitialDate);
   const [activeTab, setActiveTab] = useState('dashboard');
+  const [planState, setPlanState] = useState(pload);
+  const planning = planState.data;
+  const savePlanning = next => {
+    if(planState.error) {alert(planState.error);return;}
+    try {pvalidate(next);localStorage.setItem(PLAN_KEY, JSON.stringify(next));setPlanState({data:next,error:''});setIsDirty(true);}
+    catch(e) {alert('計画を保存できません：'+e.message);}
+  };
   const [period, setPeriod] = useState('day'); 
   const [periodicGoals, setPeriodicGoals] = useState(loadInitialGoals);
   
@@ -812,6 +967,7 @@ function App() {
   }, [date, period]);
 
   const updatePeriodicGoal = (field, val) => {
+    setIsDirty(true);
     setPeriodicGoals(prev => {
       const currentGoal = prev[goalStorageKey] || {};
       const updated = typeof currentGoal === 'object' && currentGoal !== null 
@@ -1116,7 +1272,8 @@ function App() {
 
   const saveToiCloudJSON = () => {
     if (expenseState.error) { alert(expenseState.error); return; }
-    const backup = { vault, periodicGoals, memos, expenses, version: 14 };
+    if(planState.error) {alert(planState.error);return;}
+    const backup = { vault, periodicGoals, memos, expenses, planning, version: 15 };
     const dataStr = JSON.stringify(backup, null, 2);
     const blob = new Blob([dataStr], { type: "application/json" });
     const url = URL.createObjectURL(blob); const link = document.createElement("a");
@@ -1132,11 +1289,23 @@ function App() {
     reader.onload = (event) => {
       try {
         const data = JSON.parse(event.target.result);
+        if(data.version && ![13,14,15].includes(data.version)) throw Error('未対応のバージョン');
+        const restoredPlanning = data.planning ? pvalidate(data.planning) : null;
+        if(data.version===15 && !restoredPlanning) throw Error('計画データがありません');
+        const rv=data.vault||data;
+        if(!rv || typeof rv!=='object' || Array.isArray(rv)) throw Error('記録形式が不正');
+        for(const [d,v] of Object.entries(rv)) if(!/^\d{4}-\d{2}-\d{2}$/.test(d)||!v||!Array.isArray(v.sets)) throw Error('営業日データが不正');
+        if(data.periodicGoals && (typeof data.periodicGoals!=='object'||Array.isArray(data.periodicGoals))) throw Error('目標形式が不正');
+        if(data.memos && !Array.isArray(data.memos)) throw Error('メモ形式が不正');
+        if(restoredPlanning) {const err=plinkCheck(restoredPlanning,rv);if(err)throw Error(err);}
+
         const restoredExpenses = data.vault && Object.prototype.hasOwnProperty.call(data, 'expenses') ? cleanExpenses(data.expenses) : null;
+        if(restoredPlanning) localStorage.setItem(PLAN_KEY, JSON.stringify(restoredPlanning));
         if (restoredExpenses !== null) {
           localStorage.setItem(SK.expenses, JSON.stringify(restoredExpenses));
           setExpenseState({items: restoredExpenses, error: ''});
         }
+        if(restoredPlanning) setPlanState({data:restoredPlanning,error:''});
         if (data.vault) {
           setVault(data.vault);
           if (data.periodicGoals) setPeriodicGoals(data.periodicGoals);
@@ -1144,7 +1313,7 @@ function App() {
         } else {
           setVault(data);
         }
-        setIsDirty(restoredExpenses === null && expenses.length > 0); alert(restoredExpenses === null ? "復元しました。経費を含まない旧バックアップのため、現在の経費は保持しました。" : "バックアップから復元しました！");
+        setIsDirty((restoredExpenses === null && expenses.length > 0) || !restoredPlanning); alert(restoredExpenses === null ? "復元しました。経費を含まない旧バックアップのため、現在の経費は保持しました。" : "バックアップから復元しました。計画を含まない旧形式では現在の計画設定を保持します。");
       } catch (err) { alert("同期に失敗しました。形式をご確認ください。"); }
     };
     reader.readAsText(file); e.target.value = '';
@@ -1267,6 +1436,8 @@ function App() {
           <button class={`nav-item ${activeTab === 'expenses' ? 'active' : ''}`} onClick={() => setActiveTab('expenses')}>🧾 経費</button>
           <button class={`nav-item ${activeTab === 'calendar' ? 'active' : ''}`} onClick={() => setActiveTab('calendar')}>📅 カレンダー</button>
           <button class={`nav-item ${activeTab === 'settings' ? 'active' : ''}`} onClick={() => setActiveTab('settings')}>⚙️ 設定・同期</button>
+          <button className="nav-item" onClick={() => setActiveTab('goals')}>🎯 目標管理</button>
+          <button className="nav-item" onClick={() => setActiveTab('simulator')}>🧮 逆算</button>
         </nav>
       </aside>
 
@@ -1287,7 +1458,7 @@ function App() {
         </header>
 
         {/* 📅 PERIOD SWITCHER TABS & NAVIGATION */}
-        {activeTab === 'dashboard' && (
+        {['dashboard','goals'].includes(activeTab) && (
           <div class="period-switcher-container">
             <div class="period-tabs">
               <button class={`period-tab ${period === 'day' ? 'active' : ''}`} onClick={() => setPeriod('day')}>日</button>
@@ -1371,7 +1542,7 @@ function App() {
         )}
 
         {/* 🎯 GOAL PANEL (目標パネルを上に配置) */}
-        {activeTab === 'dashboard' && (
+        {activeTab === 'goals' && (
           <div class="goal-panel">
             <div class="goal-inputs-container">
               <div class="goal-input-row">
@@ -1444,6 +1615,7 @@ function App() {
         )}
 
         {/* ── TAB 1: DASHBOARD (HOME) ── */}
+        <Planner view={activeTab} vault={vault} goals={periodicGoals} date={date} p={planning} onChange={savePlanning} navigate={setActiveTab} error={planState.error} />
         <div class={`view-container ${activeTab === 'dashboard' ? 'active' : ''}`}>
           
           {/* Platform breakdown: stacked cards for narrow screens */}
@@ -1776,4 +1948,5 @@ ReactDOM.createRoot(document.getElementById('root')).render(<App />);
 </script>
 </body>
 </html>
+
 
