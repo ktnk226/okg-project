@@ -39,55 +39,20 @@
 <script type="text/babel">
 const { useState, useEffect } = React;
 
-// 🛡️ APIキーをここに貼り付けてください
-const API_KEY = "AIzaSyAwCtBMsgaBo4OCWqQphS0d6BvQ9tUfA_Y"; 
-const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${API_KEY}`;
-
 const CATEGORIES = ["旅費交通費", "通信費", "消耗品費", "新聞図書費", "接待交際費", "地代家賃", "水道光熱費", "雑費"];
 
 function App() {
   const [items, setItems] = useState(() => JSON.parse(localStorage.getItem('exp_items')) || []);
-  const [loading, setLoading] = useState(false);
   const [current, setCurrent] = useState(null);
 
   useEffect(() => {
     localStorage.setItem('exp_items', JSON.stringify(items));
   }, [items]);
 
-  const handleFileUpload = async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    setLoading(true);
-
-    const reader = new FileReader();
-    reader.onloadend = async () => {
-      const base64Data = reader.result.split(',')[1];
-      
-      const promptText = `レシート画像から「日付(YYYY-MM-DD)」「金額(数値のみ)」「店名」「勘定科目」を抽出し、以下のJSON形式で返してください。勘定科目は[旅費交通費, 通信費, 消耗品費, 接待交際費, 雑費]から最も適切なものを選んでください。JSON以外は何も書かないでください。 {"date":"", "amount":0, "store":"", "category":""}`;
-
-      const payload = {
-        contents: [{
-          parts: [
-            { text: promptText },
-            { inline_data: { mime_type: "image/jpeg", data: base64Data } }
-          ]
-        }]
-      };
-
-      try {
-        const res = await fetch(API_URL, { method: "POST", body: JSON.stringify(payload) });
-        const data = await res.json();
-        const text = data.candidates[0].content.parts[0].text;
-        const result = JSON.parse(text.replace(/`|json/g, "").trim());
-        setCurrent(result);
-      } catch (err) {
-        console.error(err);
-        alert("解析に失敗しました。キーを確認するか、手動で入力してください。");
-        setCurrent({ date: new Date().toISOString().split('T')[0], amount: 0, store: "手動入力", category: "雑費" });
-      }
-      setLoading(false);
-    };
-    reader.readAsDataURL(file);
+  const startManualEntry = () => {
+    const today = new Date();
+    const date = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+    setCurrent({ date, amount: 0, store: "", category: "雑費" });
   };
 
   const addItem = () => {
@@ -117,14 +82,12 @@ function App() {
         </div>
       </div>
 
-      {!current && !loading && (
-        <label className="upload-zone">
-          <p>📸 レシートを撮影 / 選択</p>
-          <input type="file" accept="image/*" style={{display:'none'}} onChange={handleFileUpload} />
-        </label>
+      {!current && (
+        <div className="card">
+          <p style={{fontSize:'13px', marginBottom:'12px'}}>AI解析は現在停止中です。レシートの内容を手動で入力できます。</p>
+          <button type="button" className="btn btn-primary" onClick={startManualEntry}>手動で入力する</button>
+        </div>
       )}
-
-      {loading && <div className="loading">AIが解析中... 🚀</div>}
 
       {current && (
         <div className="card">
