@@ -44,6 +44,47 @@ const CATEGORIES = ["旅費交通費", "通信費", "消耗品費", "新聞図�
 function App() {
   const [items, setItems] = useState(() => JSON.parse(localStorage.getItem('exp_items')) || []);
   const [current, setCurrent] = useState(null);
+  const [apiBase, setApiBase] = useState(() => localStorage.getItem('receipt_api_url') || '');
+  const [accessToken, setAccessToken] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  const analyzeReceipt = async (event) => {
+    const file = event.target.files[0];
+    event.target.value = '';
+    if (!file) return;
+    setError('');
+    let endpoint;
+    try {
+      endpoint = new URL(apiBase.trim());
+      if (endpoint.protocol !== 'https:' || endpoint.username || endpoint.password || endpoint.search || endpoint.hash) throw Error();
+      endpoint.pathname = '/analyze';
+    } catch { setError('接続設定に正しいHTTPS URLを入力してください。'); return; }
+    if (!accessToken.trim()) { setError('利用パスワードを入力してください。'); return; }
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type) || file.size > 5 * 1024 * 1024) {
+      setError('5MB以下のJPEG・PNG・WebP画像を選択してください。'); return;
+    }
+    setLoading(true);
+    try {
+      const dataUrl = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = () => reject(new Error('画像を読み込めませんでした。'));
+        reader.readAsDataURL(file);
+      });
+      const response = await fetch(endpoint.href, {
+        method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${accessToken.trim()}` },
+        body: JSON.stringify({ mimeType: file.type, data: dataUrl.split(',')[1] }),
+        signal: AbortSignal.timeout(35000), credentials: 'omit', redirect: 'error'
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || '解析に失敗しました。');
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(result.date) || !Number.isSafeInteger(result.amount) || result.amount < 0 ||
+          typeof result.store !== 'string' || !CATEGORIES.includes(result.category)) throw new Error('解析結果を確認できません。手動入力してください。');
+      setCurrent({ date: result.date, amount: result.amount, store: result.store, category: result.category });
+    } catch (err) { setError(err.name === 'TimeoutError' ? '通信がタイムアウトしました。' : (err.message || '接続に失敗しました。')); }
+    finally { setLoading(false); }
+  };
 
   useEffect(() => {
     localStorage.setItem('exp_items', JSON.stringify(items));
@@ -82,13 +123,28 @@ function App() {
         </div>
       </div>
 
-      {!current && (
+      {!current && !loading && (
         <div className="card">
-          <p style={{fontSize:'13px', marginBottom:'12px'}}>AI解析は現在停止中です。レシートの内容を手動で入力できます。</p>
+          <p style={{fontSize:'13px', marginBottom:'12px'}}>{apiBase && accessToken ? '画像を解析した後、内容を確認・修正してください。' : 'AI解析は接続設定後に利用できます。手動入力はそのまま使えます。'}</p>
+          <details>
+            <summary>AI解析の接続設定</summary>
+            <label className="label" htmlFor="api-url">接続先URL</label>
+            <input id="api-url" type="url" placeholder="https://okg-receipt-api.example.workers.dev" value={apiBase} onChange={e => { setApiBase(e.target.value); localStorage.setItem('receipt_api_url', e.target.value); }} />
+            <label className="label" htmlFor="access-token">利用パスワード（GoogleのAPIキーではありません）</label>
+            <input id="access-token" type="password" autoComplete="off" value={accessToken} onChange={e => setAccessToken(e.target.value)} />
+            <p style={{fontSize:'12px'}}>利用パスワードは保存されません。自分で管理する接続先だけを設定してください。</p>
+          </details>
+          {apiBase && accessToken && <label className="upload-zone">
+            📸 レシートを撮影 / 選択
+            <input aria-label="レシート画像" type="file" accept="image/jpeg,image/png,image/webp" style={{display:'none'}} onChange={analyzeReceipt} />
+          </label>}
+          <p style={{fontSize:'12px'}}>AI解析では選択した画像をGoogleへ送信します。</p>
           <button type="button" className="btn btn-primary" onClick={startManualEntry}>手動で入力する</button>
         </div>
       )}
 
+      {loading && <p role="status" className="loading">AIが解析中です…</p>}
+      {error && <p role="alert">{error} 手動入力も利用できます。</p>}
       {current && (
         <div className="card">
           <div className="field"><label className="label">日付</label><input type="date" value={current.date} onChange={e=>setCurrent({...current, date:e.target.value})} /></div>
