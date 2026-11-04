@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>::: デリログ :::</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
@@ -12,11 +12,11 @@
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     :root {
-      --bg: #08090d; --surface: #0f1117; --surface2: #161820;
+      --bg: #10151c; --surface: #19212b; --surface2: #222d39;
       --border: rgba(255,255,255,0.1); --border2: rgba(255,255,255,0.18);
-      --text: #f0f0f0; --muted: rgba(255,255,255,0.45); --muted2: rgba(255,255,255,0.7);
-      --accent: #ff5c1a; --accent2: #e91e8c; --green: #00e676; --yellow: #ffd600;
-      --blue: #2979ff; --teal: #00bcd4;
+      --text: #f0f0f0; --muted: #a7b4c5; --muted2: #c1cbd8;
+      --accent: #8db6db; --accent2: #8db6db; --green: #85c7ae; --yellow: #d9c18d;
+      --blue: #94b9e8; --teal: #8ac8cd;
       --font-head: 'Bebas Neue', sans-serif;
       --font-body: 'Noto Sans JP', sans-serif;
       --font-mono: 'Space Mono', monospace;
@@ -65,7 +65,7 @@
       color: var(--muted2); font-size: 16px; font-weight: 700; text-align: left; cursor: pointer; transition: all 0.2s;
     }
     .nav-item:hover { background: rgba(255,255,255,0.03); color: #fff; }
-    .nav-item.active { background: linear-gradient(135deg, var(--accent), var(--accent2)); color: #fff; font-weight: 900; }
+    .nav-item.active { background: var(--accent); color: #fff; font-weight: 900; }
 
     /* HEADER TOPBAR */
     .topbar {
@@ -140,8 +140,8 @@
     
     .progress-section { margin-top: 10px; }
     .progress-track { width: 100%; height: 12px; background: rgba(255,255,255,0.05); border-radius: 6px; overflow: hidden; margin-bottom: 6px; border: 1px solid var(--border); }
-    .progress-bar { height: 100%; background: linear-gradient(90deg, var(--accent), var(--accent2)); transition: width 0.3s ease; }
-    .progress-bar.green { background: linear-gradient(90deg, var(--teal), var(--green)); }
+    .progress-bar { height: 100%; background: var(--accent); transition: width 0.3s ease; }
+    .progress-bar.green { background: var(--green); }
     
     .goal-footer-row { display: flex; justify-content: space-between; font-size: 14px; font-family: var(--font-mono); flex-direction: column; gap: 4px; }
     .goal-footer-top { display: flex; justify-content: space-between; width: 100%; align-items: center; }
@@ -308,7 +308,7 @@
 
     .cloud-indicator { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 800; padding: 6px 14px; border-radius: 20px; background: rgba(41,121,255,0.1); color: var(--blue); }
     .cloud-indicator.unsaved { background: rgba(255,214,0,0.1); color: var(--yellow); }
-    .gen-btn { width: 100%; padding: 18px; background: linear-gradient(135deg, var(--accent), var(--accent2)); border-radius: var(--radius); color: #fff; font-size: 19px; font-weight: 900; border: none; cursor: pointer; }
+    .gen-btn { width: 100%; padding: 18px; background: var(--accent); border-radius: var(--radius); color: #fff; font-size: 19px; font-weight: 900; border: none; cursor: pointer; }
 
     /* 📱 スマホ最適化 */
     @media (max-width: 768px) {
@@ -428,7 +428,7 @@
     @media(max-width:480px){.planner .grid-3{grid-template-columns:1fr;} .planner .grid-2{grid-template-columns:1fr;} }
 
     .planner-home {padding:16px; margin:0 auto;}
-    .planner .today-card {padding:22px; border:1px solid #343944; border-radius:22px; background:radial-gradient(ellipse at 100% 0,rgba(255,92,26,.09),transparent 55%),#101218; box-shadow:0 12px 32px rgba(0,0,0,.18);}
+    .planner .today-card {padding:22px; border:1px solid #343944; border-radius:22px; background:var(--surface); box-shadow:0 12px 32px rgba(0,0,0,.18);}
     .today-heading {display:flex;justify-content:space-between;align-items:center;gap:12px;}
     .today-eyebrow {font-family:var(--font-mono);font-size:11px;letter-spacing:.16em;color:#ff8c59;}
     .planner .today-heading h3 {font-size:22px;margin:2px 0 0;letter-spacing:.02em;}
@@ -440,7 +440,7 @@
     .today-amount small {font-family:var(--font-body);font-size:19px;letter-spacing:0;margin-left:8px;color:#aeb6c5;}
     .today-amount.is-empty {font-family:var(--font-body);font-size:30px;color:#858fa1;letter-spacing:.05em;}
     .today-track {height:5px;background:#252a35;border-radius:4px;overflow:hidden;}
-    .today-track>span {display:block;height:100%;background:linear-gradient(90deg,#ff5c1a,#ffa369);border-radius:4px;transition:width .2s;}
+    .today-track>span {display:block;height:100%;background:var(--accent);border-radius:4px;transition:width .2s;}
     .today-target {display:flex;justify-content:space-between;gap:12px;align-items:center;font-size:13px;color:#9da7b8;padding:10px 0;}
     .today-target strong {font-family:var(--font-mono);color:#dfe4ed;font-size:14px;}
     .planner .today-empty {font-size:13px;color:#a7afbe;line-height:1.7;margin:0 0 16px;}
@@ -469,18 +469,133 @@
     .plan-tabs {display:flex;gap:10px;margin:18px 0;}
     .plan-tabs button {flex:1;font-weight:800;}
     .planner .plan-tabs button[aria-pressed="true"] {border-color:var(--accent);color:#ffab82;background:#302019;}
-    .planner .plan-link {border:1px solid #77513b;background:linear-gradient(135deg,#241c17,#12151c);}
+    .planner .plan-link {border:1px solid #77513b;background:var(--surface);}
     .plan-badge {color:#ffc29d;font-size:12px;white-space:nowrap;}
     .plan-metrics {display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;border-block:1px solid var(--border2);padding:18px 0;margin:12px 0;}
     .plan-metrics span {display:block;color:#bbc2ce;font-size:13px;}
     .plan-metrics strong {display:block;font-size:clamp(18px,2.4vw,26px);color:#fff;font-family:var(--font-mono);}
     .planner details summary {cursor:pointer;padding:12px 0;color:#c7cfdb;}
     @media(max-width:600px){.plan-metrics{grid-template-columns:1fr 1fr;gap:16px 10px;}.plan-metrics>div:first-child{grid-column:1/-1;}.plan-metrics>div:first-child strong{font-size:34px;color:#ffab82;}.plan-tabs button{font-size:14px!important;}}
+    /* Solid colors and consistent navigation, shared by desktop and mobile. */
+    .nav-item.active,.gen-btn,.quick-log-btn {background:#365d7d;color:#fff;}
+    .nav-item {padding:14px 10px;font-size:15px;}
+    .period-tab.active {background:#365d7d;color:#fff;border:1px solid #97b8d2;}
+    button:focus-visible,summary:focus-visible {outline:3px solid #a8d0ec;outline-offset:3px;}
+    button:disabled {cursor:default;}
+    .sim-fields {border:0;min-width:0;}
+    .simulation {max-width:1080px;line-height:1.7;}
+    .sim-heading {display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px;}
+    .sim-heading h2 {font-size:24px;margin:0;}
+    .sim-heading h3 {margin:0;}
+    .sim-note {font-size:14px;line-height:1.8;color:var(--muted);}
+    .sim-tabs {display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:22px 0;}
+    .planner .sim-tabs button {background:var(--surface);border:1px solid var(--border2);border-bottom:4px solid transparent;font-size:23px;font-weight:800;line-height:1.5;}
+    .planner .sim-tabs button[aria-selected="true"] {background:#365d7d;color:#fff;border-color:#a8c5dd;box-shadow:0 0 0 1px #a8c5dd;}
+    .sim-tabs span {display:block;font-size:13px;font-weight:500;}
+    .sim-period {display:flex;align-items:center;justify-content:space-between;gap:12px;margin:16px 0;}
+    .sim-period strong {font-size:20px;}
+    .sim-period-input {display:flex;align-items:center;gap:12px;margin-bottom:18px;}
+    .sim-period-input label {flex:1;margin:0;max-width:320px;min-width:0;}
+    .sim-period-input button {margin-top:25px;}
+    .sim-goal-note {display:flex;align-items:center;color:var(--muted2);font-size:14px;}
+    .sim-stats {display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;margin:22px 0;}
+    .sim-stats span,.sim-day-target>span {display:block;color:var(--muted);font-size:14px;}
+    .sim-stats strong {display:block;font-family:var(--font-mono);font-size:clamp(18px,2.2vw,25px);overflow-wrap:anywhere;}
+    .sim-progress {height:14px;display:flex;background:#303e4d;border-radius:7px;overflow:hidden;margin:14px 0;}
+    .sim-progress>span {display:block;height:100%;transition:width .2s;}
+    .sim-progress-actual {background:#85c7ae;}
+    .sim-progress-forecast {background:#7199ba;}
+    .sim-legend {display:flex;gap:10px 18px;flex-wrap:wrap;font-size:13px;color:var(--muted2);margin:10px 0;}
+    .actual-dot::before,.forecast-dot::before {content:'';display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:6px;background:#85c7ae;}
+    .forecast-dot::before {background:#7199ba;}
+    .sim-bars {display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:10px;margin:24px 0 12px;}
+    .sim-bar-column {min-width:0;text-align:center;display:flex;flex-direction:column;align-items:center;gap:5px;}
+    .sim-bar-column>span {font-size:12px;font-family:var(--font-mono);white-space:nowrap;}
+    .sim-bar-column small {font-size:12px;color:var(--muted);}
+    .sim-bar-well {width:100%;height:125px;display:flex;align-items:flex-end;background:#222e3b;border-radius:5px;overflow:hidden;}
+    .sim-bar-fill {width:100%;background:#7199ba;display:flex;align-items:flex-end;transition:height .2s;}
+    .sim-bar-fill i {display:block;width:100%;background:#85c7ae;}
+    .sim-bar-column.is-today strong {background:#365d7d;border-radius:5px;width:100%;}
+    .sim-live {padding:14px;background:#233d42;border:1px solid #41686b;border-radius:10px;margin:16px 0;color:#e0f0ed;}
+    .sim-warning {padding:12px 14px;border:1px solid #897855;border-radius:8px;color:#ead9b8;background:#342f25;margin:12px 0;}
+    .sim-day-list {margin:20px 0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;}
+    .sim-day {border:1px solid var(--border2);border-radius:12px;padding:16px;background:#1c2733;min-width:0;}
+    .sim-day.is-today {border:2px solid #96bad7;}
+    .sim-day-heading {display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;}
+    .sim-day-heading h4 {margin:0;font-size:17px;}
+    .sim-day-heading>span {font-size:14px;color:var(--muted2);}
+    .sim-tag {display:inline-block;font-size:12px;background:#365d7d;color:#fff;padding:2px 8px;border-radius:6px;margin-left:8px;}
+    .sim-day-controls {display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:8px;align-items:center;}
+    .sim-day-controls>* {min-width:0;}
+    .sim-day-controls label {font-size:13px;}
+    .sim-day-controls select,.sim-day-controls input {font-size:16px;padding:12px 8px;}
+    .sim-day-target strong {font-size:19px;overflow-wrap:anywhere;}
+    .sim-day-result {display:flex;flex-wrap:wrap;gap:5px 12px;border-top:1px solid var(--border);padding-top:12px;margin-top:12px;}
+    .sim-day-result strong {color:#b7d9ed;}
+    .sim-day-result>span {font-size:14px;}
+    .sim-day-result small {width:100%;color:var(--muted2);}
+    .planner button.sim-text-button {background:transparent;border:0;text-align:left;color:#b7d9ed;padding:10px 0;margin-top:6px;font-size:14px;text-decoration:underline;text-underline-offset:4px;}
+    .sim-checkbox {display:flex;gap:12px;align-items:center;margin:20px 0!important;cursor:pointer;}
+    .sim-checkbox input {width:23px;min-height:23px;height:23px;flex-shrink:0;accent-color:#7199ba;}
+    .sim-link {border:1px solid var(--border2);border-radius:8px;margin:12px 0;padding:12px;}
+    .sim-history>div {display:grid;grid-template-columns:68px minmax(0,1fr) 100px;align-items:center;gap:12px;margin:15px 0;font-size:14px;}
+    .sim-history>div>div {height:12px;background:#303e4d;border-radius:4px;overflow:hidden;}
+    .sim-history i {display:block;height:100%;background:#85c7ae;}
+    .sim-history strong {text-align:right;}
+    .sim-past-row {display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;border-top:1px solid var(--border);padding:6px 0;}
+    .topbar {flex-shrink:0;}
+    .sim-save-status {font-size:13px;color:#c0d7cd;margin:8px 0 22px;}
+    .planner .today-card {background:var(--surface);border-color:#476176;box-shadow:none;}
+    .today-card h2 {font-size:22px;}
+    .today-hero {padding:16px 0;}
+    .today-target {font-size:15px;color:var(--muted2);}
+    .today-target strong {font-size:24px;}
+    .today-metrics span {font-size:14px;color:var(--muted2);}
+    .today-metrics strong {font-size:21px;}
+    .planner .sim-open {background:#365d7d;font-size:17px;margin-top:16px;min-height:52px;line-height:1.6;}
+    .sim-open small {font-size:13px;white-space:nowrap;margin-left:8px;}
+    .sim-nav-icon {font-size:24px;line-height:26px;}
+    @media(max-width:768px) {
+      .app-shell {height:100dvh;}
+      .topbar h1 {font-size:17px;line-height:1.5;overflow-wrap:anywhere;}
+      .topbar>div:first-child {min-width:0;flex:1;}
+      .topbar>div:last-child {flex-shrink:0;}
+      .simulation>.sim-heading {display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;}
+      .simulation>.sim-heading h2 {display:none;}
+      .simulation>.sim-heading .sim-note {font-size:13px;margin:0;}
+      .topbar {padding:12px;gap:8px;}
+      .topbar p {font-size:12px;}
+      .cloud-indicator {font-size:11px;padding:8px;white-space:nowrap;}
+      .simulation .sim-stats {grid-template-columns:repeat(2,minmax(0,1fr));gap:16px 10px;}
+      .simulation .sim-stats strong {font-size:22px;}
+      .sim-heading h2 {font-size:21px;}
+      .sim-day-list {grid-template-columns:1fr;}
+      .sim-bars {gap:5px;}
+      .sim-bar-column>span {font-size:10px;}
+      .sim-bar-well {height:100px;}
+      .sim-period strong {font-size:18px;}
+      .sim-tabs {gap:6px;}
+      .sim-tabs span {font-size:12px;}
+      .bottom-nav {display:grid;grid-template-columns:repeat(6,minmax(0,1fr));padding-inline:3px;}
+      .tab-btn {min-width:0;width:100%;font-size:11px;min-height:62px;line-height:1.35;gap:3px;padding:4px 2px;border-radius:8px;}
+      .tab-btn>span:last-child {max-width:78px;overflow-wrap:anywhere;}
+      .tab-btn.active {background:#2b465b;color:#e5f2fb;}
+      .tab-btn.active .nav-icon {stroke:#e5f2fb;}
+      .sim-history>div {grid-template-columns:62px minmax(0,1fr) 88px;gap:8px;font-size:13px;}
+      .planner .grid-3 {grid-template-columns:1fr;}
+    }
+    @media(max-width:360px) {
+      .sim-stats strong {font-size:19px!important;}
+      .sim-bar-column>span {font-size:9px;}
+      .sim-day-controls {grid-template-columns:1fr;}
+    }
+
   </style>
 </head>
 <body>
 <div id="root"></div>
 
+<script src="./simulation-core.js?v=16"></script>
 <script type="text/babel">
 const { useState, useMemo, useEffect, useCallback } = React;
 
@@ -516,9 +631,7 @@ function getNow() {
 }
 
 function getBusinessDateStr() {
-  const d = new Date();
-  if (d.getHours() < 4) { d.setDate(d.getDate() - 1); }
-  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  return new Date(Date.now()+5*60*60*1000).toISOString().slice(0,10);
 }
 
 function formatDateToParam(d) {
@@ -825,202 +938,106 @@ function ExpenseView({expenses, onSave, loadError}) {
 }
 
 /* ────────────────── MAIN APP ────────────────── */
-// Planning is deliberately separate from accounting records.
-const PLAN_KEY = 'delivery_log_planning_v15';
-const pn = v => Math.max(0, Number(v) || 0);
-function pdate(s, offset=0) { const d=new Date(s+'T12:00:00'); d.setDate(d.getDate()+offset); return formatDateToParam(d); }
-function pdays(a,b) { const out=[]; for(let d=a;d<=b;d=pdate(d,1)) { out.push(d); if(out.length>370) throw Error('期間が長すぎます'); } return out; }
-function prange(date,kind) {
-  if(kind==='month') {const [y,m]=date.split('-').map(Number);return [date.slice(0,7)+'-01',formatDateToParam(new Date(y,m,0,12))];}
-  const wd=new Date(date+'T12:00:00').getDay(); const mon=pdate(date,-((wd+6)%7));return [mon,pdate(mon,6)];
+function SimProgress({actual,goal,forecast=0,label='売上の進捗'}) {
+  const max=Math.max(goal,actual+forecast,1);
+  return <div className="sim-progress" role="img" aria-label={`${label}：実績 ${actual.toLocaleString()}円、目標 ${goal.toLocaleString()}円、見込み ${forecast.toLocaleString()}円`}>
+    <span className="sim-progress-actual" style={{width:(actual/max*100)+'%'}}/>
+    <span className="sim-progress-forecast" style={{width:(forecast/max*100)+'%'}}/>
+  </div>;
 }
-function pdefault() { return {quests:[],days:{},models:['閑散期','通常期','繁忙期'].map(name=>({name,u:'',d:'',uph:''})),model:1,calc:{u:'',d:'',uph:'',company:'u',share:100},scenarios:[0,5,10]}; }
-function pvalidate(p) {
-  const obj=v=>v&&typeof v==='object'&&!Array.isArray(v);
-  const number=v=>v===''||(Number.isFinite(Number(v))&&Number(v)>=0);
-  const day=v=>/^\d{4}-\d{2}-\d{2}$/.test(v)&&pdate(v)===v;
-  if(!obj(p)||!Array.isArray(p.quests)||!obj(p.days)||!Array.isArray(p.models)||p.models.length!==3||!obj(p.calc)||!Array.isArray(p.scenarios)||p.scenarios.length!==3) throw Error('計画データの形式が違います');
-  if(!['u','d','both'].includes(p.calc.company)||!['u','d','uph','share'].every(k=>number(p.calc[k]))||pn(p.calc.share)>100||!Number.isInteger(p.model)||p.model<0||p.model>2||!p.scenarios.every(v=>number(v)&&Number.isInteger(Number(v)))||Number(p.scenarios[0])!==0) throw Error('計算条件が不正です');
-  if(!p.models.every(m=>obj(m)&&typeof m.name==='string'&&['u','d','uph'].every(k=>number(m[k])))) throw Error('モデルが不正です');
-  const ids=new Set();
-  for(const q of p.quests) {
-    if(!obj(q)||typeof q.id!=='string'||ids.has(q.id)||!day(q.start)||!day(q.end)||q.end<q.start||pdays(q.start,q.end).length>4||!['n','base','extra'].includes(q.aim)||!['n','base','extra'].includes(q.finish)||!['n','base','extra','miss'].includes(q.status)||!['count','base','extra','adjust'].every(k=>number(q[k]))||pn(q.count)<10||pn(q.count)>120||pn(q.count)%10||!Array.isArray(q.links)) throw Error('クエスト条件が不正です');
-    ids.add(q.id);
-    for(const l of q.links) if(!obj(l)||!day(l.date)||!number(l.amount)) throw Error('報酬紐付けが不正です');
-  }
-  for(const [d,v] of Object.entries(p.days)) if(!day(d)||!obj(v)||!['auto','off','amt','cnt'].includes(v.mode)||!number(v.value)) throw Error('日別計画が不正です');
-  const ordered=[...p.quests].sort((a,b)=>a.start.localeCompare(b.start));
-  for(let i=1;i<ordered.length;i++) if(ordered[i].start<=ordered[i-1].end) throw Error('日跨ぎクエストの期間が重複しています');
-  return p;
-}
-function pload() { try {const raw=localStorage.getItem(PLAN_KEY); return {data:raw?pvalidate(JSON.parse(raw)):pdefault(),error:''};} catch(e){return {data:pdefault(),error:'計画データを読み込めません。バックアップから復元してください。'};} }
-function pday(vault,date) {
-  const day=vault[date]||{}, s=(day.sets||[]).slice(-1)[0]||{};
-  const pf=k=>({amt:pn(s[k+'_cum']),cnt:pn(s[k+'_cnt_cum']),que:pn(s[k+'_que_cum'])});
-  const u=pf('u'),d=pf('d'),all=['u','d','r','m'].map(pf);
-  return {u,d,real:all.reduce((a,x)=>a+x.amt,0),cnt:all.reduce((a,x)=>a+x.cnt,0),que:all.reduce((a,x)=>a+x.que,0),hours:(day.sets||[]).reduce((a,x)=>a+(calcDuration(x.start,x.end)?.total||0),0)};
-}
-function preward(q,c) {return c<pn(q.count)?0:pn(q.base)+(c>=pn(q.count)+10?pn(q.extra):0);}
-function pprogress(vault,q,date,extraU=0) {return Math.max(0,pdays(q.start,q.end).filter(d=>d<=date).reduce((a,d)=>a+pday(vault,d).u.cnt,0)-pn(q.adjust)+(date>=q.start&&date<=q.end?extraU:0));}
-function pbudget(q) {if(q.status==='miss'||q.aim==='n')return 0;const stage=q.status==='n'?q.aim:q.status;return pn(q.base)+(stage==='extra'?pn(q.extra):0);}
-function pallocation(q,date) {if(date<q.start||date>q.end)return 0;const days=pdays(q.start,q.end),n=pbudget(q),part=Math.floor(n/days.length);return date===q.end?n-part*(days.length-1):part;}
-function plinkCheck(p,vault) {
-  const sums={};for(const q of p.quests)for(const l of q.links)sums[l.date]=(sums[l.date]||0)+pn(l.amount);
-  for(const [d,n] of Object.entries(sums))if(n>pday(vault,d).u.que) return d+'：紐付け額がUberの記録済みクエスト報酬を超えています';return '';
-}
-function pamount(vault,p,date) {
-  const day=pday(vault,date),links=p.quests.flatMap(q=>q.links).filter(l=>l.date===date).reduce((a,l)=>a+pn(l.amount),0);
-  return day.real+day.que-links+p.quests.reduce((a,q)=>a+pallocation(q,date),0);
-}
-function pmix(c,n) {const u=c.company==='u'?n:c.company==='d'?0:Math.round(n*pn(c.share)/100);return {u,d:n-u,amt:u*pn(c.u)+(n-u)*pn(c.d)};}
-function pready(c) {return (c.company==='u'?pn(c.u)>0:c.company==='d'?pn(c.d)>0:(pn(c.share)===0||pn(c.u)>0)&&(pn(c.share)===100||pn(c.d)>0));}
-function punit(c) {return c.company==='u'?pn(c.u):c.company==='d'?pn(c.d):pn(c.u)*pn(c.share)/100+pn(c.d)*(1-pn(c.share)/100);}
-function pneed(c,amt) {
-  if(amt<=0)return 0;if(!pready(c))return null;
-  let lo=0,hi=Math.ceil(amt/Math.min(...[c.company!=='d'?pn(c.u):Infinity,c.company!=='u'?pn(c.d):Infinity].filter(n=>n>0)))+2;
-  // Rounding the company split may briefly flatten earnings, but never reduces it with positive fares.
-  while(lo<hi){let m=Math.floor((lo+hi)/2);if(pmix(c,m).amt>=amt)hi=m;else lo=m+1;}return lo;
-}
-function pgoal(goals,date,kind){const key=kind==='week'?'W-'+getYearWeekStr(date):'M-'+date.slice(0,7);const v=goals[key];return pn(typeof v==='object'?v?.amt:v);}
-function pfixed(p,date) {const v=p.days[date];if(v?.mode==='amt')return pn(v.value);if(v?.mode==='cnt')return pmix(p.calc,pn(v.value)).amt+p.quests.reduce((a,q)=>a+pallocation(q,date),0);return null;}
-function pdistribute(vault,goals,p,date,kind,includeToday,extra=0) {
-  const [start,end]=prange(date,kind),goal=pgoal(goals,date,kind);
-  const prior=pdays(start,end).filter(d=>includeToday?d<date:d<=date).reduce((a,d)=>a+pamount(vault,p,d),0)+extra;
-  const future=pdays(start,end).filter(d=>(includeToday?d>=date:d>date)&&p.days[d]?.mode!=='off');
-  const fixed=future.filter(d=>pfixed(p,d)!==null),free=future.filter(d=>pfixed(p,d)===null);
-  const remain=Math.max(0,goal-prior),reserved=fixed.reduce((a,d)=>a+pfixed(p,d),0),daily=free.length?Math.ceil(Math.max(0,remain-reserved)/free.length):0;
-  return {goal,remain,daily,future,fixed,free,unallocated:free.length===0?Math.max(0,remain-reserved):0,amountFor:d=>pfixed(p,d)??daily};
-}
-function pscenario(vault,p,date,n) {
-  const mix=pmix(p.calc,n);
-  const next={...p,quests:p.quests.map(q=>{
-    if(date<q.start||date>q.end||(q.finish==='n'&&date!==q.end))return q;
-    const c=pprogress(vault,q,date,mix.u),r=preward(q,c);
-    return {...q,status:r===0?'miss':c>=pn(q.count)+10?'extra':'base'};
-  })};
-  return {mix,p:next,landing:pamount(vault,next,date)+mix.amt};
-}
-function psolve(vault,p,date,target) {
-  if(pscenario(vault,p,date,0).landing>=target)return 0;
-  if(!pready(p.calc)||punit(p.calc)<=0)return null;
-  let hi=1;while(hi<1000000&&pscenario(vault,p,date,hi).landing<target)hi*=2;
-  if(pscenario(vault,p,date,hi).landing<target)return null;
-  let lo=0;while(lo<hi){let m=Math.floor((lo+hi)/2);if(pscenario(vault,p,date,m).landing>=target)hi=m;else lo=m+1;}return lo;
-}
-// Today's quota is the remaining quest count spread across remaining working days.
-function pquota(vault,p,date) {
-  return p.quests.filter(q=>q.aim!=='n'&&q.status==='n'&&date>=q.start&&date<=q.end).map(q=>{
-    const remaining=Math.max(0,pn(q.count)+(q.aim==='extra'?10:0)-pprogress(vault,q,date));
-    const days=pdays(date,q.finish==='n'?q.end:date).filter(d=>p.days[d]?.mode!=='off');
-    const today=p.days[date]?.mode==='off'?0:days.length?Math.ceil(remaining/days.length):0;
-    return {id:q.id,remaining,today,days:days.length,unallocated:days.length===0?remaining:0};
-  });
-}
-function prequirements(vault,goals,p,date,target) {
-  const off=p.days[date]?.mode==='off',day=pday(vault,date);
-  const countTarget=off?0:Math.ceil(p.days[date]?.mode==='cnt'?pn(p.days[date].value):pn(goals['D-'+date]?.cnt));
-  const countNeed=Math.max(0,countTarget-day.cnt),quotas=pquota(vault,p,date);
-  const uberNeed=Math.max(0,...quotas.map(q=>q.today));
-  const amountNeed=psolve(vault,p,date,target);
-  let questNeed=0,reason='';
-  if(uberNeed>0) {
-    if(p.calc.company==='d'||(p.calc.company==='both'&&pn(p.calc.share)===0)) {questNeed=null;reason='Uberノルマを満たせません。追加配達の会社・Uber比率を変更してください。';}
-    else {
-      let lo=0,hi=p.calc.company==='u'?uberNeed:Math.ceil((uberNeed+1)*100/pn(p.calc.share));
-      if(!Number.isSafeInteger(hi)) {questNeed=null;reason='Uber比率が小さすぎます。計算条件を変更してください。';}
-      else {while(lo<hi){const n=Math.floor((lo+hi)/2);if(pmix(p.calc,n).u>=uberNeed)hi=n;else lo=n+1;}questNeed=lo;}
-    }
-  }
-  if(amountNeed===null&&!reason)reason='売上目標の逆算には、使用する会社の通常単価を設定してください。';
-  const need=amountNeed===null||questNeed===null?null:Math.max(amountNeed,countNeed,questNeed);
-  return {countTarget,countNeed,quotas,uberNeed,amountNeed,questNeed,need,reason,hasRequirements:target>0||countTarget>0||quotas.some(q=>q.remaining>0)};
-}
-function psummary(vault,goals,p,date) {
-  const w=pdistribute(vault,goals,p,date,'week',true),m=pdistribute(vault,goals,p,date,'month',true),manual=pfixed(p,date),g=goals['D-'+date],old=pn(typeof g==='object'?g?.amt:g);
-  const target=p.days[date]?.mode==='off'?0:manual??(old||Math.max(w.goal?w.amountFor(date):0,m.goal?m.amountFor(date):0));
-  const actual=pamount(vault,p,date),remain=Math.max(0,target-actual),requirements=prequirements(vault,goals,p,date,target);
-  const source=p.days[date]?.mode==='off'?'休み':manual!==null?(p.days[date]?.mode==='cnt'?'日別の件数指定':'日別の売上指定'):old>0?'日目標':w.goal||m.goal?(w.goal&&(!m.goal||w.amountFor(date)>=m.amountFor(date))?'週目標から自動配分':'月目標から自動配分'):'未設定';
-  return {...requirements,w,m,target,actual,remain,source,hasGoal:target>0||manual!==null||old>0,manual:manual!==null||old>0};
-}
-function ptime(cnt,uph){if(cnt===null||pn(uph)<=0)return '未設定';const min=Math.ceil(cnt/pn(uph)*60);return Math.floor(min/60)+'時間'+min%60+'分';}
-function Planner({view,vault,goals,date,p,onChange,navigate,error,onDateChange}) {
-  const [mode,setMode]=useState('amt'),[money,setMoney]=useState(''),[editDate,setEditDate]=useState(date);
-  const [questPart,setQuestPart]=useState('front');
-  const [notice,setNotice]=useState('');
-  useEffect(()=>{setEditDate(date);setMoney('');},[date]);
-  const change=next=>{try{pvalidate(next);onChange(next);setNotice('');}catch(e){setNotice(e.message);}};
-  const calc=(k,v)=>change({...p,calc:{...p.calc,[k]:v}});
-  const day=pday(vault,date),sum=psummary(vault,goals,p,date),linkError=plinkCheck(p,vault),blocked=error||linkError;
-  const active=p.quests.filter(q=>date>=q.start&&date<=q.end);
+function Planner({view,vault,goals,date,p,onChange,onGoalsChange,navigate,error,onActualDate,today}) {
+  const [tab,setTab]=useState('week'),[simDate,setSimDate]=useState(today),[notice,setNotice]=useState('');
+  useEffect(()=>{if(view==='simulation'){setTab('week');setSimDate(today);}},[view,today]);
   const yen=n=>Math.round(n).toLocaleString()+'円';
-  const field=(label,value,onChange,opts={})=><label>{label}<input type="number" min="0" step="any" value={value} onChange={e=>onChange(e.target.value)} {...opts}/></label>;
-  const qchange=(id,k,v)=>change({...p,quests:p.quests.map(q=>q.id===id?{...q,[k]:v}:q)});
-  const dayChange=(k,v)=>change({...p,days:{...p.days,[editDate]:{mode:'auto',value:'',...p.days[editDate],[k]:v}}});
-  const addQuest=()=>{const [mon]=prange(date,'week');const start=questPart==='front'?mon:pdate(mon,4),end=pdate(start,questPart==='front'?3:2);change({...p,quests:[...p.quests,{id:start,start,end,count:120,base:'',extra:'',adjust:0,aim:'base',finish:'n',status:'n',links:[]}]});};
-  const listDates=pdays(date,prange(date,'month')[1]>prange(date,'week')[1]?prange(date,'month')[1]:prange(date,'week')[1]);
-  const resultCard=(n,i)=>{
-    const mix=pmix(p.calc,n),qdata=active.map(q=>({q,c:pprogress(vault,q,date,mix.u)}));
-    const simulated=pscenario(vault,p,date,n).p;
-    const qDelta=simulated.quests.reduce((a,q)=>a+pallocation(q,date),0)-p.quests.reduce((a,q)=>a+pallocation(q,date),0);
-    const requirements=prequirements(vault,goals,p,date,mode==='amt'&&money!==''?pn(money):sum.target);
-    const ds=pday(vault,date),hours=pn(p.calc.uph)>0?ds.hours+n/pn(p.calc.uph):null;
-    return <div className="card" key={i}><h3>{mode==='amt'?'目標達成まで あと'+n+'件':n===0?'今終了':`あと${n}件`}</h3>{mode==='cnt'&&i>0&&field('追加件数',p.scenarios[i],v=>change({...p,scenarios:p.scenarios.map((x,j)=>i===j?v:x)}),{step:1})}
-      <p>Uber {mix.u}件 ／ 出前館 {mix.d}件</p>
-      <p>売上目標：{pscenario(vault,p,date,n).landing>=(mode==='amt'&&money!==''?pn(money):sum.target)?'達成見込み':'未達'} ／ 今日の件数目標：{n>=requirements.countNeed?'達成見込み':'未達'} ／ 本日のUberノルマ：{mix.u>=requirements.uberNeed?'達成見込み':'未達'}</p><p>通常売上 ＋{yen(mix.amt)}</p><strong>今日の計画着地 {yen(pamount(vault,simulated,date)+mix.amt)}</strong>
-      <p>追加時間 {ptime(n,p.calc.uph)}</p><p>通常平均単価 {ds.cnt+n?yen((ds.real+mix.amt)/(ds.cnt+n)):'—'}</p><p>着地時給（計画配分込） {hours>0?yen((pamount(vault,simulated,date)+mix.amt)/hours):'—'}</p>
-      {qdata.map(({q,c})=><p key={q.id}>Uberクエスト {c}件 ／ 基本まで{Math.max(0,pn(q.count)-c)}件 ／ 追加まで{Math.max(0,pn(q.count)+10-c)}件<br/>ここで期間終了なら報酬 {yen(preward(q,c))}<br/>{(()=>{const days=pdays(q.start,q.end).filter(d=>d>date&&p.days[d]?.mode!=='off');const remain=Math.max(0,pn(q.count)+(q.aim==='extra'?10:0)-c);return days.length?'期限まで残り'+days.length+'稼働日：Uber '+Math.ceil(remain/days.length)+'件/日（全体UPH換算の参考 '+ptime(Math.ceil(remain/days.length),p.calc.uph)+'）':remain?'期限内に残りUber '+remain+'件':'狙う回数に到達';})()}</p>)}
-      <details><summary>明日以降への影響を見る</summary>{['week','month'].map(kind=>{const r=pdistribute(vault,goals,simulated,date,kind,false,mix.amt);return <div key={kind}><h4>{kind==='week'?'週間':'月間'}：明日以降</h4>{r.goal?<><p>残り{yen(r.remain)} ／ 稼働予定{r.future.length}日</p>{r.unallocated>0&&<p>未配分 {yen(r.unallocated)}</p>}{r.future.map(d=>{const amt=r.amountFor(d),alloc=simulated.quests.reduce((a,q)=>a+pallocation(q,d),0),nc=pneed(p.calc,Math.max(0,amt-alloc));return <p key={d}>{d.slice(5)}：{yen(amt)}・{nc===null?'件数未設定':nc+'件'}・{ptime(nc,p.calc.uph)}</p>;})}</>:<p>目標未設定</p>}</div>;})}
-      </details>{qDelta!==0&&<p>期間終了条件による当日配分差 {yen(qDelta)}</p>}
-    </div>;
+  const change=next=>{try{pvalidate(next);const issue=plinkCheck(next,vault);if(issue)throw Error(issue);if(onChange(next)!==false)setNotice('変更を保存しました。配分・見込みに反映済みです。');}catch(e){setNotice(e.message);}};
+  const field=(label,value,fn,opts={})=><label>{label}<input type="number" inputMode="decimal" min="0" step="1" value={value} onChange={e=>{if(e.target.validity.valid)fn(e.target.value);}} {...opts}/></label>;
+  const calc=(key,value)=>change({...p,calc:{...p.calc,[key]:value}});
+  const dayChange=(d,setting)=>change({...p,days:{...p.days,[d]:setting}});
+  const qchange=(id,key,value)=>change({...p,quests:p.quests.map(q=>q.id===id?{...q,[key]:value}:q)});
+  const sum=psummary(vault,goals,p,today),linkError=plinkCheck(p,vault),blocked=error||linkError;
+  const week=pweek(vault,goals,p,simDate,today),[start,end]=prange(simDate,tab);
+  const goal=pgoal(goals,simDate,tab),actual=pactual(vault,start,end);
+  const updateGoal=value=>{onGoalsChange(psetGoal(goals,simDate,tab,value));setNotice('目標を保存しました。この期間の試算に反映済みです。');};
+  const stepPeriod=direction=>{
+    if(tab==='week')setSimDate(pdate(simDate,direction*7));
+    else {const d=new Date(simDate+'T12:00:00');d.setDate(1);if(tab==='month')d.setMonth(d.getMonth()+direction);else d.setFullYear(d.getFullYear()+direction);setSimDate(formatDateToParam(d));}
   };
-  if(!['dashboard','simulator','goals','settings'].includes(view))return null;
-  return <section className={'planner '+(view==='dashboard'?'planner-home':'view-container active')}>
-    {(view==='goals'||view==='simulator')&&<button className="gen-btn" onClick={()=>navigate('dashboard')}>← ホームへ</button>}
-    {(notice||blocked)&&<p role="alert" style={{color:'var(--yellow)'}}>{notice||blocked}</p>}
-    {(view==='goals'||view==='simulator')&&<>
-      <div className="plan-tabs" role="group" aria-label="目標と逆算の切替"><button aria-pressed={view==='goals'} onClick={()=>navigate('goals')}>① 目標を設定</button><button aria-pressed={view==='simulator'} onClick={()=>navigate('simulator')}>② 必要量を逆算</button></div>
-      <div className="card plan-link" aria-label="連動中の目標">
-        <div className="today-heading"><h3>この日の目標と必要量</h3><span className="plan-badge">入力と連動</span></div>
-        <label>逆算する営業日<input type="date" value={date} onChange={e=>e.target.value&&onDateChange(e.target.value)}/></label>
-        <div className="today-target"><span>採用中：{sum.source}</span><strong>{sum.hasGoal?yen(sum.target):'未設定'}</strong></div>
-        <div className="plan-metrics"><div><span>目標まであと</span><strong>{blocked?'—':sum.hasGoal?yen(sum.remain):'—'}</strong></div><div><span>追加の配達</span><strong>{blocked||!sum.hasRequirements?'—':sum.need===null?'条件を確認':sum.need+'件'}</strong></div><div><span>必要時間の目安</span><strong>{blocked||!sum.hasRequirements?'—':sum.need===0?'0分':ptime(sum.need,p.calc.uph)}</strong></div></div>
-        <div className="plan-constraints" aria-label="本日の達成条件"><p>売上目標まで：{sum.hasGoal?yen(sum.remain):'未設定'} ／ 売上に必要な追加件数：{sum.amountNeed===null?'単価未設定':sum.amountNeed+'件'}</p><p>今日の件数目標：{sum.countTarget>0?sum.countTarget+'件（あと'+sum.countNeed+'件）':'未設定'}</p>{sum.quotas.map(q=><p key={q.id}>クエスト残り Uber {q.remaining}件 ／ 残り{q.days}稼働日 → 本日はあとUber {q.today}件{q.unallocated>0?'（稼働予定がなく、ノルマを配分できません）':''}</p>)}<p>追加件数は、売上・件数目標・本日のUberノルマをすべて満たす値です。</p></div>
-        {sum.reason&&<p role="alert">{sum.reason}</p>}
-        <p>計画実績 {yen(sum.actual)}（クエスト配分 {yen(active.reduce((a,q)=>a+pallocation(q,date),0))} 込み）</p>
-        <details><summary>目標の決まり方・内訳</summary><p>休み → 日別の指定 → 日目標 → 週・月の自動配分の順に適用します。週と月の両方がある場合は、高い方を採用します。</p><p>週基準：{sum.w.goal?yen(sum.w.amountFor(date)):'未設定'} ／ 月基準：{sum.m.goal?yen(sum.m.amountFor(date)):'未設定'}</p><p>売上・今日の件数目標・本日のクエストノルマを同時に満たす必要件数を計算します。クエスト残数は今日を含む残り稼働日で均等配分し、最終日・今日で終了する想定では残り全件が必要です。週・月の件数目標、年目標は日別の自動配分に含みません。</p><p>クエスト報酬は達成前提の計画値です。目標欄の会計実績とは異なる場合があります。</p></details>
-        {p.days[date]?.mode&&p.days[date].mode!=='auto'&&<p>この日は「{sum.source}」を優先しています。<button onClick={()=>change({...p,days:{...p.days,[date]:{mode:'auto',value:''}}})}>日・週・月の目標を使う</button></p>}
-        {!sum.hasGoal&&<p>日・週・月の売上目標を設定すると、必要件数を計算します。</p>}
-        {view==='goals'?<button className="gen-btn" onClick={()=>{setMode('amt');setMoney('');navigate('simulator');}}>この目標で逆算する →</button>:<button onClick={()=>navigate('goals')}>目標を編集する</button>}
-      </div>
-    </>}
-    {view==='dashboard'&&(()=>{
-      const hasGoal=sum.hasGoal;
-
-      const percent=hasGoal&&sum.target>0?Math.min(100,Math.round(sum.actual/sum.target*100)):0;
-      return <div className="card today-card">
-        <div className="today-heading"><div><span className="today-eyebrow">TODAY / PLAN</span><h3>今日のゴール</h3></div><span className="today-date">{date.slice(5).replace('-',' / ')}</span></div>
-        <div className="today-basis">クエスト達成時の報酬を含む計画</div>
-        {!blocked&&<>
-          <div className="today-hero"><span>{hasGoal?(sum.remain>0?'目標まであと':'売上目標クリア'):'売上目標'}</span><div className={'today-amount '+(!hasGoal?'is-empty':'')}>{hasGoal?<>{Math.round(sum.remain).toLocaleString()}<small>円</small></>:'未設定'}</div></div>
-          {hasGoal?<><div className="today-track"><span style={{width:percent+'%'}}/></div><div className="today-target"><span>{sum.manual?'設定した目標':'自動計算の目標'}</span><strong>{yen(sum.target)}</strong></div></>:<p className="today-empty">週・月の目標を設定すると、今日の必要量を計算します。</p>}
-          <div className="today-metrics"><div><span>必要件数</span><strong>{!sum.hasRequirements?'—':sum.need===null?'条件を確認':<>{sum.need}<small>件</small></>}</strong></div><div><span>必要時間</span><strong>{!sum.hasRequirements?'—':sum.need===0?'0分':ptime(sum.need,p.calc.uph)}</strong></div></div>
-          {sum.reason&&<p role="alert">{sum.reason}</p>}{sum.quotas.map(q=><p key={q.id}>本日のクエストノルマ：あとUber {q.today}件（期間残り{q.remaining}件／{q.days}稼働日）{q.unallocated>0?'・稼働予定なし':''}</p>)}
-          {sum.countTarget>0&&<div className="today-target"><span>今日の件数目標まで</span><strong>あと {sum.countNeed}件</strong></div>}
-          {active.map(q=>{const c=pprogress(vault,q,date),target=pn(q.count)+(q.aim==='extra'?10:0),left=Math.max(0,target-c);return <div className="today-quest" key={q.id}><div className="today-quest-head"><span><i/>Uber Eats クエスト</span><strong>{q.aim==='n'?'計画対象外':left?'あと '+left+'件':'目標回数に到達'}</strong></div><div className="today-quest-progress"><strong>{c}<small> / {target}件</small></strong><span>{q.aim==='extra'?'追加10回まで':q.aim==='n'?'未選択':'基本回数まで'}</span></div><div className="today-track quest-track"><span style={{width:Math.min(100,target?c/target*100:0)+'%'}}/></div><div className="today-quest-foot">期限 {pdate(q.end,1).slice(5).replace('-','/')} 04:00</div></div>;})}
-        </>}
-        <div className="today-actions"><button className="gen-btn" onClick={()=>navigate('simulator')}>逆算する <span>↗</span></button><button className="today-edit" onClick={()=>navigate('goals')}>目標を設定・編集</button></div>
-      </div>;
-    })()}
-    {view==='goals'&&<><h2>稼働予定・クエスト</h2><p>目標の変更は自動で逆算に反映されます。休みの日は自動配分から除きます。</p><div className="card"><h3>日別の稼働予定</h3><label>対象日<input type="date" value={editDate} onChange={e=>{if(e.target.value)setEditDate(e.target.value);}}/></label><select value={p.days[editDate]?.mode||'auto'} onChange={e=>dayChange('mode',e.target.value)}><option value="auto">自動配分</option><option value="off">休み</option><option value="amt">売上を指定（配分込）</option><option value="cnt">件数を指定</option></select>{['amt','cnt'].includes(p.days[editDate]?.mode)&&field('指定値',p.days[editDate]?.value||'',v=>dayChange('value',v))}<p>件数指定は逆算の会社・単価条件を使用します。</p><details><summary>今後の予定一覧</summary>{listDates.map(d=><p key={d}><button onClick={()=>setEditDate(d)}>{d}</button> {p.days[d]?.mode||'auto'} {p.days[d]?.value||''}</p>)}</details></div>
-    <div className="card"><h3>Uber Eats 日跨ぎクエスト</h3><p>開始日の04:00〜最終営業日の翌日04:00（日本時間）。選んだ候補だけ登録します。</p><select value={questPart} onChange={e=>setQuestPart(e.target.value)}><option value="front">選択週の前半（月〜木）</option><option value="back">選択週の後半（金〜日）</option></select><button className="gen-btn" onClick={addQuest}>クエストを登録</button></div>
-    {p.quests.map(q=><div className="card" key={q.id}><h3>{q.start} 〜 {q.end}</h3><p>終了：{pdate(q.end,1)} 04:00</p><label>Uber側で選択した回数<select value={q.count} onChange={e=>qchange(q.id,'count',Number(e.target.value))}>{Array.from({length:12},(_,i)=>(i+1)*10).map(n=><option key={n} value={n}>{n}回</option>)}</select></label>{field('基本達成報酬（円）',q.base,v=>qchange(q.id,'base',v))}{field('追加10回の報酬（円）',q.extra,v=>qchange(q.id,'extra',v))}<label>狙う段階<select value={q.aim} onChange={e=>qchange(q.id,'aim',e.target.value)}><option value="n">計画に含めない／未選択</option><option value="base">基本回数まで</option><option value="extra">追加10回まで</option></select></label><p>Uber実績 {pprogress(vault,q,date)}件 ／ 計画報酬 {yen(pbudget(q))}</p>
-    {field('対象外件数（Uber累計から控除）',q.adjust,v=>qchange(q.id,'adjust',v),{step:1})}
-    <label>期間終了後の結果<select value={q.status} onChange={e=>qchange(q.id,'status',e.target.value)}><option value="n">計画中</option><option value="base">基本達成</option><option value="extra">追加達成</option><option value="miss">未達</option></select></label><details><summary>実績に入力済みの日跨ぎ報酬を紐付ける</summary><p>入力済みUberクエスト報酬のうち、このクエスト分だけを指定。計画での重複を除きます。</p>{q.links.map((l,i)=><div key={i}><input type="date" value={l.date} onChange={e=>e.target.value&&qchange(q.id,'links',q.links.map((v,j)=>i===j?{...v,date:e.target.value}:v))}/>{field('記録済み金額',l.amount,v=>qchange(q.id,'links',q.links.map((l,j)=>i===j?{...l,amount:v}:l)))}<button onClick={()=>qchange(q.id,'links',q.links.filter((_,j)=>i!==j))}>紐付け解除</button></div>)}<button onClick={()=>qchange(q.id,'links',[...q.links,{date,amount:0}])}>紐付けを追加</button></details><button className="del-btn" onClick={()=>{if(confirm('このクエスト設定を削除しますか？実績は保持します。'))change({...p,quests:p.quests.filter(v=>v.id!==q.id)});}}>設定を削除</button></div>)}</>}
-    {view==='simulator'&&<><h2>逆算シミュレーター</h2><div className="card"><h3>計算条件</h3><p>単価と1時間あたりの配達件数を設定してください。</p><label>追加配達の会社<select value={p.calc.company} onChange={e=>calc('company',e.target.value)}><option value="u">Uber中心（追加はUber）</option><option value="d">出前館中心（追加は出前館）</option><option value="both">両方</option></select></label>{p.calc.company==='both'&&field('Uber件数比率（%）',p.calc.share,v=>calc('share',v),{max:100})}<div className="grid-2">{field('Uber通常単価（円）',p.calc.u,v=>calc('u',v))}{field('出前館通常単価（円）',p.calc.d,v=>calc('d',v))}</div>{field('全体UPH（件/時）',p.calc.uph,v=>calc('uph',v))}<p>今日の通常単価：Uber {day.u.cnt?yen(day.u.amt/day.u.cnt):'—'} ／ 出前館 {day.d.cnt?yen(day.d.amt/day.d.cnt):'—'}</p><button onClick={()=>change({...p,calc:{...p.calc,u:day.u.cnt?Math.round(day.u.amt/day.u.cnt):p.calc.u,d:day.d.cnt?Math.round(day.d.amt/day.d.cnt):p.calc.d}})}>この実績単価を使う</button><label>季節モデル<select value={p.model} onChange={e=>change({...p,model:Number(e.target.value)})}>{p.models.map((m,i)=><option value={i} key={i}>{m.name}</option>)}</select></label><button onClick={()=>change({...p,calc:{...p.calc,u:p.models[p.model].u,d:p.models[p.model].d,uph:p.models[p.model].uph}})}>単価・UPHの組を使う</button></div>
-    <div className="card"><label>比較方法<select value={mode} onChange={e=>setMode(e.target.value)}><option value="cnt">あと何件</option><option value="amt">目標とクエストから必要件数を逆算</option></select></label>{mode==='amt'&&<><p>{money===''?'設定した目標と連動中':'一時的な目標で試算中（保存した目標は変更しません）'}</p>{field('試算用の着地目標（空欄なら連動中の目標）',money,setMoney)}{money!==''&&<button onClick={()=>setMoney('')}>設定した目標に戻す</button>}</>}{active.map(q=><label key={q.id}>クエストの期間を今日で終了する想定<select value={q.finish} onChange={e=>qchange(q.id,'finish',e.target.value)}><option value="n">明日以降も継続</option><option value="base">今日で終了として比較</option></select></label>)}</div>
-    {!blocked&&(mode==='amt'&&money===''&&!sum.hasRequirements?<p>目標管理で売上・件数目標またはクエストを設定してください。</p>:mode==='cnt'&&!pready(p.calc)?<p>使用する会社の通常単価を設定してください。</p>:mode==='cnt'?<div className="planner-results">{p.scenarios.map((n,i)=>resultCard(Math.floor(pn(n)),i))}</div>:(()=>{const r=prequirements(vault,goals,p,date,money===''?sum.target:pn(money));return r.need===null?<p role="alert">{r.reason}</p>:resultCard(r.need,0);})())}
-    <p>通常売上と配分額は計画値です。会計の実績は変更しません。</p></>}
-    {view==='settings'&&<div className="card"><h2>単価・UPHのプリセット</h2>{p.models.map((m,i)=><div key={i}><h3>{m.name}</h3><div className="grid-3">{['u','d','uph'].map((k,j)=>field(['Uber単価','出前館単価','UPH'][j],m[k],v=>change({...p,models:p.models.map((x,z)=>z===i?{...x,[k]:v}:x)})))}</div></div>)}</div>}
+  const addQuest=part=>{
+    const mon=prange(simDate,'week')[0],qstart=part==='front'?mon:pdate(mon,4),qend=part==='front'?pdate(mon,3):pdate(mon,6);
+    change({...p,quests:[...p.quests,{id:qstart,start:qstart,end:qend,count:40,base:'',extra:'',adjust:0,aim:'base',finish:'n',status:'n',links:[]}]});
+  };
+  if(!['dashboard','simulation','settings'].includes(view))return null;
+  if(view==='dashboard')return <section className="planner planner-home" aria-label="今日の売上目標">
+    <div className="card today-card">
+      <div className="today-heading"><h2>今日の売上目標</h2><span className="today-date">{today.slice(5).replace('-',' / ')}</span></div>
+      <p className="sim-note">週のシミュレーションと連動 · 04:00で営業日が切り替わります</p>
+      {blocked?<p role="alert">{blocked}</p>:<>
+        <div className="today-target"><span>{sum.off?'稼働予定：休み':sum.manual?'日別に指定した目標':'週目標から自動配分'}</span><strong data-testid="home-target">{sum.hasGoal||sum.off?yen(sum.target):'未設定'}</strong></div>
+        <div className="today-hero"><span>今日の残り必要額</span><div className="today-amount" data-testid="home-remaining">{sum.hasGoal||sum.off?<>{sum.remain.toLocaleString()}<small>円</small></>:'未設定'}</div></div>
+        <SimProgress actual={sum.actual} goal={sum.target}/><p className="sim-note">入力済み実績 {yen(sum.actual)} · クエスト見込みは実績に含みません</p>
+        <div className="today-metrics"><div><span>残り必要件数</span><strong data-testid="home-count">{!sum.hasGoal&&!sum.uberNeed?'—':sum.need===null?'単価を設定':sum.need+'件'}</strong></div><div><span>残り必要時間</span><strong data-testid="home-time">{!sum.hasGoal&&!sum.uberNeed?'—':ptime(sum.need,p.calc.uph)}</strong></div></div>
+        {sum.reason&&<p className="sim-warning">{sum.reason}</p>}
+        {sum.quotas.map(q=><p className="sim-note" key={q.id}>Uberクエスト：今日あと{q.today}件（期間残り{q.remaining}件／{q.days}稼働日）{q.unallocated?' · 稼働予定がなく配分できません':''}</p>)}
+        {!sum.hasGoal&&<p>週目標を設定すると、今日の必要量が表示されます。</p>}
+      </>}
+      <button className="gen-btn sim-open" onClick={()=>navigate('simulation')}>🧮 売上シミュレーション <small>週タブへ →</small></button>
+    </div>
+  </section>;
+  if(view==='settings')return <section className="planner view-container active"><div className="card"><h2>週の単価・UPHプリセット</h2>{p.models.map((m,i)=><div key={i}><h3>{m.name}</h3><div className="grid-3">{['u','d','uph'].map((k,j)=><React.Fragment key={k}>{field(['Uber単価（円）','出前館単価（円）','UPH（件/時）'][j],m[k],v=>change({...p,models:p.models.map((x,z)=>z===i?{...x,[k]:v}:x)}),{step:'any'})}</React.Fragment>)}</div></div>)}</div></section>;
+  return <section className="planner view-container active simulation" aria-label="売上シミュレーション">
+    <div className="sim-heading"><div><h2>🧮 売上シミュレーション</h2><p className="sim-note">実績をもとに、次の売上を組み立てる</p></div><button onClick={()=>navigate('dashboard')}>ホームへ →</button></div>
+    <div className="sim-tabs" role="tablist" aria-label="シミュレーションの期間">{[['week','週'],['month','月'],['year','年']].map(([key,label])=><button key={key} id={'sim-tab-'+key} role="tab" aria-selected={tab===key} aria-controls="simulation-panel" tabIndex={tab===key?0:-1} onKeyDown={e=>{const tabs=['week','month','year'];if(e.key==='ArrowRight'||e.key==='ArrowLeft'){e.preventDefault();const next=tabs[(tabs.indexOf(tab)+(e.key==='ArrowRight'?1:2))%3];setTab(next);document.getElementById('sim-tab-'+next).focus();}}} onClick={()=>{setTab(key);setNotice('');}}>{label}<span>{key==='week'?'日別の配分':key==='month'?'月の見通し':'年の見通し'}</span></button>)}</div>
+    <div id="simulation-panel" role="tabpanel" aria-labelledby={'sim-tab-'+tab}>
+      <div className="sim-period"><button aria-label="前の期間" onClick={()=>stepPeriod(-1)}>←</button><strong>{tab==='week'?start.slice(5)+' 〜 '+end.slice(5):tab==='month'?simDate.slice(0,7).replace('-','年')+'月':simDate.slice(0,4)+'年'}</strong><button aria-label="次の期間" onClick={()=>stepPeriod(1)}>→</button></div>
+      <div className="sim-period-input"><label>{tab==='week'?'週に含まれる日':tab==='month'?'対象月':'対象年'}<input aria-label="シミュレーション対象期間" type={tab==='week'?'date':tab==='month'?'month':'number'} min={tab==='year'?'2000':undefined} max={tab==='year'?'9999':undefined} value={tab==='week'?simDate:tab==='month'?simDate.slice(0,7):Number(simDate.slice(0,4))} onChange={e=>{const v=e.target.value;if(tab==='year'){if(/^\d{4}$/.test(v)&&Number(v)>=2000)setSimDate(v+'-01-01');}else if(v)setSimDate(tab==='month'?v+'-01':v);}}/></label><button onClick={()=>setSimDate(today)}>今{tab==='week'?'週':tab==='month'?'月':'年'}へ</button></div>
+      {blocked&&<p className="sim-warning" role="alert">{blocked}</p>}
+      <fieldset className="sim-fields" disabled={!!error}>
+        <div className="card sim-overview">
+          <div className="grid-2">{field((tab==='week'?'週':tab==='month'?'月':'年')+'の売上目標（円）',goal||'',updateGoal,{placeholder:'目標を入力', 'data-testid':'simulation-goal'})}<div className="sim-goal-note">{tab==='week'?'実績と稼働予定に応じて、残りの日へ配分します。':'この目標・想定を変更しても、週の日別配分は変わりません。'}</div></div>
+          <div className="sim-stats"><div><span>入力済み実績</span><strong data-testid="simulation-actual">{yen(actual)}</strong></div><div><span>目標までの不足額</span><strong data-testid="simulation-deficit">{goal?yen(Math.max(0,goal-actual)):'—'}</strong></div><div><span>達成率</span><strong>{goal?Math.round(actual/goal*100)+'%':'—'}</strong></div></div>
+          <SimProgress actual={actual} goal={goal}/><div className="sim-legend"><span className="actual-dot">実績</span><span>目標 {yen(goal)}</span><span>不足 {goal?yen(Math.max(0,goal-actual)):'—'}</span></div>
+        </div>
+        {tab==='week'?<>
+          <div className="card"><div className="sim-heading"><h3>日別の配分</h3><span className="sim-tag">ホームと連動</span></div>
+            <p className="sim-note">金額を指定すると、その差額をほかの「自動配分」の稼働日へ均等に振り分けます。過去の日と休みの日には配分しません。</p>
+            <div className="sim-bars" role="img" aria-label="日別の実績と残り配分">{week.rows.map(r=>{const max=Math.max(...week.rows.map(x=>Math.max(x.actual,x.target)),1);return <div className={'sim-bar-column '+(r.date===today?'is-today':'')} key={r.date}><span>{formatSmartAmt(r.target||r.actual)||'0円'}</span><div className="sim-bar-well"><div className="sim-bar-fill" style={{height:Math.max(r.actual,r.target)/max*100+'%'}}><i style={{height:Math.min(100,r.actual/Math.max(r.target,r.actual,1)*100)+'%'}}/></div></div><strong>{['日','月','火','水','木','金','土'][new Date(r.date+'T12:00:00').getDay()]}</strong><small>{r.setting.mode==='off'?'休み':r.date.slice(5).replace('-','/')}</small></div>;})}</div>
+            <div className="sim-legend"><span className="actual-dot">実績</span><span className="forecast-dot">これからの配分</span></div>
+            <div className="sim-live" role="status">配達で残り {yen(week.deliveryRemain)} ／ 残り稼働日 {week.rows.filter(r=>r.eligible).length}日{week.credit>0?'（クエスト見込み '+yen(week.credit)+' を控除）':''}</div>
+            {week.unallocated>0&&<p className="sim-warning">未配分 {yen(week.unallocated)}。自動配分の稼働日を追加するか、指定額を増やしてください。</p>}
+            {week.excess>0&&<p className="sim-warning">指定した配分が必要額を {yen(week.excess)} 上回っています。</p>}
+            {!goal&&<p className="sim-note">週の売上目標を入力すると自動配分を開始します。</p>}
+            <div className="sim-day-list">{week.rows.filter(r=>r.date>=today).map(r=>{const req=prequirements(vault,p,r.date,r.target,r.setting),past=r.date<today;return <article className={'sim-day '+(r.date===today?'is-today':'')} key={r.date} data-testid={'allocation-'+r.date}>
+              <div className="sim-day-heading"><h4>{r.date.slice(5).replace('-','/')}（{['日','月','火','水','木','金','土'][new Date(r.date+'T12:00:00').getDay()]}）{r.date===today&&<span className="sim-tag">今日</span>}</h4><span>実績 {yen(r.actual)}</span></div>
+              <div className="sim-day-controls"><label>稼働・配分<select aria-label={r.date+'の稼働予定'} disabled={past} value={r.setting.mode} onChange={e=>dayChange(r.date,{mode:e.target.value,value:e.target.value==='amt'?String(Math.round(r.target)):e.target.value==='cnt'?String(pneed(p.calc,r.target)||0):''})}><option value="auto">自動配分</option><option value="off">休み</option><option value="amt">金額を指定</option><option value="cnt">件数を指定</option></select></label>{['amt','cnt'].includes(r.setting.mode)?field(r.setting.mode==='amt'?'この日の目標（円）':'この日の目標（件）',r.setting.value,v=>dayChange(r.date,{mode:r.setting.mode,value:v}),{disabled:past,'aria-label':r.date+'の指定値'}):<div className="sim-day-target"><span>{past?'過去の営業日':'この日の目標'}</span><strong data-testid="day-target">{past?'配分対象外':r.setting.mode==='off'?'休み':yen(r.target)}</strong></div>}</div>
+              {!past&&r.setting.mode!=='off'&&<div className="sim-day-result"><strong>残り {yen(r.remaining)}</strong><span>あと {req.need===null?'単価を設定':req.need+'件'} · {ptime(req.need,p.calc.uph)}</span>{req.uberNeed>0&&<small>うちUberが必要：{req.uberNeed}件{req.reason?' · '+req.reason:''}</small>}</div>}
+              {r.setting.legacy&&<p className="sim-note">以前の日目標を引き継いでいます。「自動配分」に切り替えて解除できます。</p>}
+              <button className="sim-text-button" onClick={()=>onActualDate(r.date)}>ホームで{past?'実績を確認・修正':'実績を入力'} →</button>
+            </article>;})}</div>
+            {week.rows.some(r=>r.date<today)&&<details><summary>過去の日の実績（{week.rows.filter(r=>r.date<today).length}日）</summary>{week.rows.filter(r=>r.date<today).map(r=><div className="sim-past-row" key={r.date}><span>{r.date.slice(5)} · 実績 {yen(r.actual)}</span><button className="sim-text-button" onClick={()=>onActualDate(r.date)}>ホームで確認・修正 →</button></div>)}</details>}
+            <button onClick={()=>{const days={...p.days};week.rows.filter(r=>r.eligible).forEach(r=>days[r.date]={mode:'auto',value:''});change({...p,days});}}>残り稼働日をすべて自動配分に戻す</button>
+          </div>
+          <div className="card"><h3>件数・時間の計算条件</h3><p className="sim-note">通常単価で売上を換算し、Uberクエストに必要な件数も満たすよう計算します。</p><label>配達する会社<select aria-label="配達する会社" value={p.calc.company} onChange={e=>calc('company',e.target.value)}><option value="u">Uber Eats</option><option value="d">出前館</option><option value="both">Uber Eats と 出前館</option></select></label>{p.calc.company==='both'&&field('Uber Eatsの件数比率（%）',p.calc.share,v=>calc('share',v),{max:100,step:'any'})}<div className="grid-3">{field('Uber通常単価（円）',p.calc.u,v=>calc('u',v),{step:'any'})}{field('出前館通常単価（円）',p.calc.d,v=>calc('d',v),{step:'any'})}{field('1時間あたりの配達件数（UPH）',p.calc.uph,v=>calc('uph',v),{step:'any'})}</div><details><summary>季節のプリセットを使う</summary><label>プリセット<select value={p.model} onChange={e=>change({...p,model:Number(e.target.value)})}>{p.models.map((m,i)=><option key={i} value={i}>{m.name}</option>)}</select></label><button onClick={()=>change({...p,calc:{...p.calc,u:p.models[p.model].u,d:p.models[p.model].d,uph:p.models[p.model].uph}})}>この単価・UPHを適用</button><p className="sim-note">プリセットは設定画面で変更できます。</p></details></div>
+          <div className="card"><h3>Uber Eats クエスト</h3><p className="sim-note">前半：月〜木 ／ 後半：金〜日。終了は翌日04:00（日本時間）。Uber Eatsの件数だけを集計します。</p><div className="grid-2">{[['front','前半（月〜木）'],['back','後半（金〜日）']].map(([part,label])=>{const qs=part==='front'?week.start:pdate(week.start,4);return <button key={part} disabled={p.quests.some(q=>q.start<=(part==='front'?pdate(week.start,3):week.end)&&q.end>=qs)} onClick={()=>addQuest(part)}>{label}のクエストを追加</button>;})}</div>
+            <label className="sim-checkbox"><input type="checkbox" checked={week.includeQuest} onChange={e=>change({...p,weekly:{...p.weekly,[pgoalKey(simDate,'week')]:{includeQuest:e.target.checked}}})}/>クエスト見込みを週の必要売上から差し引く</label><p>入力済み売上に含む報酬と別に、未入力の見込み {yen(week.forecast)}</p><p className="sim-note">期間内のUber報酬を見込みから自動控除します。別日に入力した報酬は下で紐付けてください。見込みは売上実績に加算しません。</p>
+          </div>
+          {week.quests.map(({q,recorded,pending})=>{const count=pprogress(vault,q,today),target=pn(q.count)+(q.aim==='extra'?10:0);return <div className="card sim-quest" key={q.id}>
+            <h3>{q.start===week.start?'週前半':q.start===pdate(week.start,4)?'週後半':'登録済みクエスト'} · {q.start.slice(5)} 〜 {q.end.slice(5)}</h3>
+            <p data-testid={'quest-progress-'+q.id}>対象実績 {count}件 ／ {target}件（出前館などは対象外）</p><div className="sim-progress" role="progressbar" aria-label="Uberクエスト件数" aria-valuenow={count} aria-valuemin={0} aria-valuemax={Math.max(target,count)}><span className="sim-progress-actual" style={{width:Math.min(100,count/Math.max(1,target)*100)+'%'}}/></div>
+            <div className="grid-3"><label>基本の対象回数<select aria-label="基本の対象回数" value={q.count} onChange={e=>qchange(q.id,'count',Number(e.target.value))}>{Array.from({length:12},(_,i)=>(i+1)*10).map(n=><option key={n} value={n}>{n}回</option>)}</select></label>{field('基本達成報酬（円）',q.base,v=>qchange(q.id,'base',v))}{field('追加10回の報酬（円）',q.extra,v=>qchange(q.id,'extra',v))}</div>
+            <div className="grid-2"><label>目指す段階<select aria-label="目指す段階" value={q.aim} onChange={e=>qchange(q.id,'aim',e.target.value)}><option value="n">見込みに含めない</option><option value="base">基本達成</option><option value="extra">追加10回まで</option></select></label><label>結果の確認<select aria-label="結果の確認" value={q.status} onChange={e=>qchange(q.id,'status',e.target.value)}><option value="n">挑戦中（見込み）</option><option value="base">基本達成を確認</option><option value="extra">追加達成を確認</option><option value="miss">未達</option></select></label></div>
+            <div className="sim-stats"><div><span>入力済み確定報酬</span><strong>{yen(recorded)}</strong></div><div><span>未入力の報酬見込み</span><strong>{yen(pending)}</strong></div></div><p className="sim-note">達成の確認だけでは実績売上に加算されません。報酬の実績入力はホームで行ってください。</p>
+            <details><summary>対象外件数・別日の報酬紐付け</summary>{field('Uber累計から除く対象外件数',q.adjust,v=>qchange(q.id,'adjust',v))}<p className="sim-note">期間外の日に入力済みのUber報酬を紐付けると、その分の見込みを控除します。</p>{q.links.map((l,i)=><div className="sim-link" key={i}><label>報酬の入力日<input type="date" value={l.date} onChange={e=>e.target.value&&qchange(q.id,'links',q.links.map((v,j)=>i===j?{...v,date:e.target.value}:v))}/></label>{field('紐付ける入力済み報酬（円）',l.amount,v=>qchange(q.id,'links',q.links.map((x,j)=>i===j?{...x,amount:v}:x)))}<button onClick={()=>qchange(q.id,'links',q.links.filter((_,j)=>i!==j))}>紐付けを解除</button></div>)}<button onClick={()=>qchange(q.id,'links',[...q.links,{date:today,amount:0}])}>別日の報酬を紐付ける</button></details>
+            <button className="sim-text-button" onClick={()=>{if(confirm('クエスト設定を削除しますか？入力済みの売上実績は保持されます。'))change({...p,quests:p.quests.filter(x=>x.id!==q.id)});}}>クエスト設定を削除</button>
+          </div>;})}
+        </>:(()=>{const h=phorizon(vault,goals,p,simDate,tab,today),setAssumption=(k,v)=>change({...p,horizons:{...p.horizons,[h.key]:{...h.setting,[k]:v}}});const buckets=tab==='year'?Array.from({length:12},(_,i)=>{const month=h.start.slice(0,4)+'-'+String(i+1).padStart(2,'0')+'-01';return {label:(i+1)+'月',value:pactual(vault,...prange(month,'month'))};}):Array.from({length:Math.ceil(pdays(h.start,h.end).length/7)},(_,i)=>{const a=pdate(h.start,i*7),b=pdate(a,6);return {label:(i*7+1)+'〜'+Math.min(i*7+7,Number(h.end.slice(8)))+'日',value:pactual(vault,a,b<h.end?b:h.end)};});return <>
+          <div className="card"><h3>残り期間の見通し</h3><p>今日を含む残り {h.remainingDays}日 ／ 想定する稼働 {h.workDays}日</p><div className="grid-2">{field('残りの想定稼働日数（空欄は残り全日）',h.setting.workDays,v=>setAssumption('workDays',v),{max:h.remainingDays,placeholder:String(h.remainingDays)})}{field('今後1稼働日あたりの追加売上（円）',h.setting.daily,v=>setAssumption('daily',v),{placeholder:String(h.daily)})}</div><p className="sim-note">売上想定が空欄の場合は、この期間に売上を入力した日の平均 {yen(h.daily)} を使用します。今日に売上がある場合も、今後の想定は追加分として計算します。</p>
+          <div className="sim-stats"><div><span>達成に必要な売上／稼働日</span><strong data-testid="horizon-required">{h.required===null?'稼働予定なし':yen(h.required)}</strong></div><div><span>この想定での着地</span><strong data-testid="horizon-projection">{yen(h.projection)}</strong></div><div><span>想定着地と目標の差</span><strong>{goal?(h.projection>=goal?'＋'+yen(h.projection-goal):'−'+yen(h.gap)):'—'}</strong></div></div><SimProgress actual={h.actual} goal={h.goal} forecast={h.daily*h.workDays} label="想定着地"/><div className="sim-legend"><span className="actual-dot">実績 {yen(h.actual)}</span><span className="forecast-dot">今後の想定 {yen(h.daily*h.workDays)}</span></div>
+          <p className="sim-live" data-testid="horizon-outlook">{!goal?'目標を入力して見通しを確認できます。':h.projection>=goal?'この想定では目標を達成する見込みです。':h.workDays?'目標まであと '+yen(h.gap)+'。稼働日数・1日あたりの売上を調整して確認できます。':'残りの稼働予定がありません。目標・対象期間・稼働日数を確認してください。'}</p></div>
+          <div className="card"><h3>{tab==='year'?'月別':'期間別'}の入力済み実績</h3><div className="sim-history">{buckets.map(b=><div key={b.label}><span>{b.label}</span><div><i style={{width:b.value/Math.max(...buckets.map(x=>x.value),1)*100+'%'}}/></div><strong>{yen(b.value)}</strong></div>)}</div><p className="sim-note">対象期間の全プラットフォームの売上と入力済み報酬を集計します。見込み報酬は含みません。</p></div>
+        </>;})()}
+      </fieldset>
+    </div>
+    <p className="sim-save-status" role="status">{notice||'変更はこの端末に自動保存されます。設定画面からJSONでバックアップできます。'}</p>
   </section>;
 }
 
@@ -1038,12 +1055,15 @@ function App() {
   const [vault, setVault] = useState(loadInitialVault);
   const [date, setDate] = useState(loadInitialDate);
   const [activeTab, setActiveTab] = useState('dashboard');
+  useEffect(()=>{document.querySelector('.main-content')?.scrollTo(0,0);},[activeTab]);
+  const [today,setToday] = useState(getBusinessDateStr);
+  useEffect(()=>{const timer=setInterval(()=>setToday(getBusinessDateStr()),30000);return ()=>clearInterval(timer);},[]);
   const [planState, setPlanState] = useState(pload);
   const planning = planState.data;
   const savePlanning = next => {
-    if(planState.error) {alert(planState.error);return;}
-    try {pvalidate(next);localStorage.setItem(PLAN_KEY, JSON.stringify(next));setPlanState({data:next,error:''});setIsDirty(true);}
-    catch(e) {alert('計画を保存できません：'+e.message);}
+    if(planState.error) {alert(planState.error);return false;}
+    try {pvalidate(next);localStorage.setItem(PLAN_KEY, JSON.stringify(next));setPlanState({data:next,error:''});setIsDirty(true);return true;}
+    catch(e) {alert('計画を保存できません：'+e.message);return false;}
   };
   const [period, setPeriod] = useState('day'); 
   const [periodicGoals, setPeriodicGoals] = useState(loadInitialGoals);
@@ -1114,17 +1134,6 @@ function App() {
     if (period === 'month') return `M-${y}-${m}`;
     return `Y-${y}`;
   }, [date, period]);
-
-  const updatePeriodicGoal = (field, val) => {
-    setIsDirty(true);
-    setPeriodicGoals(prev => {
-      const currentGoal = prev[goalStorageKey] || {};
-      const updated = typeof currentGoal === 'object' && currentGoal !== null 
-        ? { ...currentGoal, [field]: Number(val) }
-        : { amt: Number(currentGoal || 0), cnt: 0, [field]: Number(val) };
-      return { ...prev, [goalStorageKey]: updated };
-    });
-  };
 
   const calced = useMemo(() => {
     const n = v => parseFloat(v) || 0;
@@ -1422,7 +1431,7 @@ function App() {
   const saveToiCloudJSON = () => {
     if (expenseState.error) { alert(expenseState.error); return; }
     if(planState.error) {alert(planState.error);return;}
-    const backup = { vault, periodicGoals, memos, expenses, planning, version: 15 };
+    const backup = { vault, periodicGoals, memos, expenses, planning, version: 16 };
     const dataStr = JSON.stringify(backup, null, 2);
     const blob = new Blob([dataStr], { type: "application/json" });
     const url = URL.createObjectURL(blob); const link = document.createElement("a");
@@ -1438,9 +1447,9 @@ function App() {
     reader.onload = (event) => {
       try {
         const data = JSON.parse(event.target.result);
-        if(data.version && ![13,14,15].includes(data.version)) throw Error('未対応のバージョン');
+        if(data.version && ![13,14,15,16].includes(data.version)) throw Error('未対応のバージョン');
         const restoredPlanning = data.planning ? pvalidate(data.planning) : null;
-        if(data.version===15 && !restoredPlanning) throw Error('計画データがありません');
+        if(data.version>=15 && !restoredPlanning) throw Error('計画データがありません');
         const rv=data.vault||data;
         if(!rv || typeof rv!=='object' || Array.isArray(rv)) throw Error('記録形式が不正');
         for(const [d,v] of Object.entries(rv)) if(!/^\d{4}-\d{2}-\d{2}$/.test(d)||!v||!Array.isArray(v.sets)) throw Error('営業日データが不正');
@@ -1585,8 +1594,7 @@ function App() {
           <button class={`nav-item ${activeTab === 'expenses' ? 'active' : ''}`} onClick={() => setActiveTab('expenses')}>🧾 経費</button>
           <button class={`nav-item ${activeTab === 'calendar' ? 'active' : ''}`} onClick={() => setActiveTab('calendar')}>📅 カレンダー</button>
           <button class={`nav-item ${activeTab === 'settings' ? 'active' : ''}`} onClick={() => setActiveTab('settings')}>⚙️ 設定・同期</button>
-          <button className={`nav-item ${activeTab==='goals'?'active':''}`} onClick={() => setActiveTab('goals')}>🎯 目標管理</button>
-          <button className={`nav-item ${activeTab==='simulator'?'active':''}`} onClick={() => setActiveTab('simulator')}>🧮 逆算</button>
+          <button className={`nav-item ${activeTab==='simulation'?'active':''}`} aria-current={activeTab==='simulation'?'page':undefined} onClick={() => setActiveTab('simulation')}>🧮 売上シミュレーション</button>
         </nav>
       </aside>
 
@@ -1595,7 +1603,7 @@ function App() {
         <header class="topbar">
           <div>
             <p>Target // {date.replace(/-/g,'/')}</p>
-            <h1>🛵 DELIVERY LOG</h1>
+            <h1>{activeTab==='simulation'?'🧮 売上シミュレーション':'🛵 DELIVERY LOG'}</h1>
           </div>
           <div style={{display:'flex', gap:'10px'}}>
             {isDirty ? (
@@ -1607,7 +1615,7 @@ function App() {
         </header>
 
         {/* 📅 PERIOD SWITCHER TABS & NAVIGATION */}
-        {['dashboard','goals'].includes(activeTab) && (
+        {activeTab === 'dashboard' && (
           <div class="period-switcher-container">
             <div class="period-tabs">
               <button class={`period-tab ${period === 'day' ? 'active' : ''}`} onClick={() => setPeriod('day')}>日</button>
@@ -1623,6 +1631,8 @@ function App() {
             </div>
           </div>
         )}
+
+        <Planner view={activeTab} vault={vault} goals={periodicGoals} date={date} p={planning} onChange={savePlanning} onGoalsChange={next=>{setPeriodicGoals(next);setIsDirty(true);}} navigate={setActiveTab} onActualDate={d=>{setDate(d);setPeriod('day');setActiveTab('dashboard');setTimeout(()=>document.getElementById('delivery-set-entry')?.scrollIntoView({behavior:'smooth'}),100);}} error={planState.error} today={today} />
 
         {/* 📊 iPhone-first LIVE SUMMARY HEADER */}
         {activeTab === 'dashboard' && (
@@ -1690,64 +1700,8 @@ function App() {
           </div>
         )}
 
-        {/* 🎯 GOAL PANEL (目標パネルを上に配置) */}
-        {activeTab === 'goals' && (
-          <div class="goal-panel"><h2 style={{fontSize:20,marginBottom:8}}>目標を設定</h2><p style={{color:'var(--muted2)',marginBottom:16}}>上の期間を選んで入力。変更は自動保存され、下の必要量に反映されます。</p>
-            <div class="goal-inputs-container">
-              <div class="goal-input-row">
-                <div class="goal-title-flex"><span>🎯 {periodLabels[period]}目標金額</span></div>
-                <div class="goal-input-wrapper">
-                  <input class="goal-input" min="0" type="number" value={activePeriodData.goalAmt || ''} onChange={e => updatePeriodicGoal('amt', e.target.value)} placeholder="未設定" />
-                  <span style={{fontSize:'14px', color:'var(--muted)'}}>円</span>
-                </div>
-              </div>
-              <div class="goal-input-row">
-                <div class="goal-title-flex"><span>📦 {periodLabels[period]}目標件数</span></div>
-                <div class="goal-input-wrapper">
-                  <input class="goal-input" min="0" type="number" value={activePeriodData.goalCnt || ''} onChange={e => updatePeriodicGoal('cnt', e.target.value)} placeholder="未設定" />
-                  <span style={{fontSize:'14px', color:'var(--muted)'}}>件</span>
-                </div>
-              </div>
-            </div>
-            
-            {activePeriodData.goalAmt > 0 && (
-              <div class="progress-section">
-                <div class="progress-track"><div class="progress-bar" style={{ width: `${activePeriodData.percentAmt}%` }}></div></div>
-                <div class="goal-footer-row">
-                  <div class="goal-footer-top">
-                    <div class="goal-status-text">金額達成率 <strong>{activePeriodData.percentAmt}%</strong></div>
-                    {activePeriodData.remainAmt <= 0 ? (
-                      <div class="goal-remain-text done">🎉 金額目標達成！</div>
-                    ) : (
-                      <div class="goal-remain-text remain">残り {activePeriodData.remainAmt.toLocaleString()}円</div>
-                    )}
-                  </div>
-                  
-                  <p className="goal-footer-sub">必要件数・時間は下の「この日の目標と必要量」で確認できます。</p>
-                </div>
-              </div>
-            )}
-
-            {activePeriodData.goalCnt > 0 && (
-              <div class="progress-section" style={{marginTop:'8px'}}>
-                <div class="progress-track"><div class="progress-bar green" style={{ width: `${activePeriodData.percentCnt}%` }}></div></div>
-                <div class="goal-footer-row">
-                  <div class="goal-footer-top">
-                    <div class="goal-status-text">件数達成率 <strong>{activePeriodData.percentCnt}%</strong></div>
-                    {activePeriodData.remainCnt <= 0 ? (
-                      <div class="goal-remain-text done">🎉 件数目標達成！</div>
-                    ) : (
-                      <div class="goal-remain-text remain">残り {activePeriodData.remainCnt} 件</div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-
         {/* ── TAB 1: DASHBOARD (HOME) ── */}
-        <Planner view={activeTab} vault={vault} goals={periodicGoals} date={date} p={planning} onChange={savePlanning} navigate={setActiveTab} onDateChange={setDate} error={planState.error} />
+
         <div class={`view-container ${activeTab === 'dashboard' ? 'active' : ''}`}>
           
           {/* Platform breakdown: stacked cards for narrow screens */}
@@ -2035,7 +1989,7 @@ function App() {
           <div class="section-title">☁️ iCloud Drive バックアップ / 同期</div>
           <div class="card" style={{borderColor:'var(--blue)', background:'rgba(41,121,255,0.03)'}}>
             <p style={{fontSize:'14px', color:'var(--muted2)', marginBottom:'14px'}}>
-              稼働ログ、メモ、目標設定、経費を含む全データをJSONファイルで保存・復元します。写真は含みません。
+              稼働ログ、メモ、週・月・年のシミュレーション、クエスト、経費を含む全データをJSONファイルで保存・復元します。写真は含みません。
             </p>
             <div class="grid-2">
               <button class="gen-btn" style={{background:'var(--blue)'}} onClick={saveToiCloudJSON}>💾 iCloudへ完全保存</button>
@@ -2054,6 +2008,7 @@ function App() {
           <button class={`tab-btn ${activeTab === 'dashboard' ? 'active' : ''}`} onClick={() => setActiveTab('dashboard')}>
             <svg class="nav-icon" viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg><span>ホーム</span>
           </button>
+          <button className={`tab-btn ${activeTab === 'simulation' ? 'active' : ''}`} aria-current={activeTab==='simulation'?'page':undefined} onClick={() => setActiveTab('simulation')}><span aria-hidden="true" className="sim-nav-icon">🧮</span><span>売上シミュレーション</span></button>
           <button class={`tab-btn ${activeTab === 'memos' ? 'active' : ''}`} onClick={() => setActiveTab('memos')}>
             <svg class="nav-icon" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg><span>メモ</span>
           </button>
