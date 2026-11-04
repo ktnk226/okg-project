@@ -43,3 +43,14 @@ test('supports CORS preflight without authentication', async () => {
   assert.equal(response.status, 204);
   assert.equal(response.headers.get('Access-Control-Allow-Origin'), origin);
 });
+
+test('identifies each missing runtime setting without leaking secret values', async () => {
+  for (const name of ['GEMINI_API_KEY', 'RECEIPT_ACCESS_TOKEN', 'RATE_LIMITER']) {
+    const response = await worker.fetch(request(image), { ...env, [name]: undefined });
+    assert.equal(response.status, 503);
+    const body = await response.text();
+    assert.ok(body.includes(name));
+    assert.ok(!body.includes('test-key'));
+    assert.ok(!body.includes('test-password'));
+  }
+});

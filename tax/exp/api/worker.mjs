@@ -16,7 +16,9 @@ export default {
     if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: { ...headers,
       'Access-Control-Allow-Methods': 'POST', 'Access-Control-Allow-Headers': 'Authorization, Content-Type' } });
     if (request.method !== 'POST') return reply(405, 'POSTを使用してください。');
-    if (!env.GEMINI_API_KEY || !env.RECEIPT_ACCESS_TOKEN || !env.RATE_LIMITER) return reply(503, 'AI解析の準備中です。');
+    if (!env.GEMINI_API_KEY) return reply(503, 'GEMINI_API_KEYが公開中のWorkerに反映されていません。');
+    if (!env.RECEIPT_ACCESS_TOKEN) return reply(503, 'RECEIPT_ACCESS_TOKENが公開中のWorkerに反映されていません。');
+    if (typeof env.RATE_LIMITER?.limit !== 'function') return reply(503, 'RATE_LIMITERが公開中のWorkerに接続されていません。');
     if (request.headers.get('Authorization') !== `Bearer ${env.RECEIPT_ACCESS_TOKEN}`) return reply(401, '利用パスワードを確認してください。');
     if (!(await env.RATE_LIMITER.limit({ key: 'receipt-owner' })).success) return reply(429, '利用回数の上限です。しばらく待ってください。');
     if (!request.headers.get('Content-Type')?.startsWith('application/json')) return reply(415, 'JSON形式で送信してください。');
