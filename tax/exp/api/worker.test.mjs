@@ -54,3 +54,23 @@ test('identifies each missing runtime setting without leaking secret values', as
     assert.ok(!body.includes('test-password'));
   }
 });
+test('delivery endpoint uses delivery categories and rejects incompatible categories', async () => {
+  const previous = globalThis.fetch;
+  let receipt = { date: '2026-11-04', amount: 1800, store: '給油所', category: '燃料費' };
+  globalThis.fetch = async (_url, options) => {
+    const prompt = JSON.parse(options.body).contents[0].parts[0].text;
+    assert.ok(prompt.includes('燃料費'));
+    assert.ok(prompt.includes('駐車・通行料'));
+    return Response.json({ candidates: [{ content: { parts: [{ text: JSON.stringify(receipt) }] } }] });
+  };
+  const deliveryRequest = () => new Request('https://example.com/analyze-expense', {
+    method: 'POST', headers: { Origin: origin, Authorization: 'Bearer test-password', 'Content-Type': 'application/json' }, body: JSON.stringify(image)
+  });
+  try {
+    const success = await worker.fetch(deliveryRequest(), env);
+    assert.equal(success.status, 200);
+    assert.deepEqual(await success.json(), receipt);
+    receipt.category = '旅費交通費';
+    assert.equal((await worker.fetch(deliveryRequest(), env)).status, 422);
+  } finally { globalThis.fetch = previous; }
+});

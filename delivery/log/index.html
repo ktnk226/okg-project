@@ -620,6 +620,27 @@ async function expenseImageCanvas(file) {
   } finally {URL.revokeObjectURL(url);}
 }
 
+const EXPENSE_AI_ENDPOINT = 'https://okg-project.ktnk226.workers.dev/analyze-expense';
+async function analyzeExpenseImage(file, token) {
+  let canvas;
+  try {
+    canvas = await expenseImageCanvas(file);
+    const image = canvas.toDataURL('image/jpeg', 0.85).split(',')[1];
+    if (image.length > 4 * Math.ceil(5 * 1024 * 1024 / 3)) throw new Error('画像が大きすぎます。小さい写真で再試行してください。');
+    const response = await fetch(EXPENSE_AI_ENDPOINT, {
+      method:'POST', headers:{'Content-Type':'application/json',Authorization:`Bearer ${token.trim()}`},
+      body:JSON.stringify({mimeType:'image/jpeg',data:image}),
+      signal:AbortSignal.timeout(35000), credentials:'omit', redirect:'error'
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error || 'AI解析に失敗しました。');
+    if (!validExpenseDate(result.date) || !Number.isSafeInteger(result.amount) || result.amount <= 0 || result.amount > 999999999 ||
+        !EXPENSE_CATEGORIES.includes(result.category) || typeof result.store !== 'string' || !result.store.trim() || result.store.length > 200)
+      throw new Error('解析結果を確認できません。手動入力してください。');
+    return {date:result.date,amount:String(result.amount),category:result.category,payee:result.store};
+  } finally { if(canvas) {canvas.width=0;canvas.height=0;} }
+}
+
 function buildExpenseFreeeCSV(rows, settings, account) {
   const quote = value => '"' + String(value ?? '').replace(/"/g, '""') + '"';
   const header = ['収支区分','管理番号','発生日','決済期日','取引先コード','取引先','勘定科目','税区分','金額','税計算区分','税額','備考','品目','部門','メモタグ','決済日','決済口座','決済金額'];
@@ -646,6 +667,8 @@ function ExpenseView({expenses, onSave, loadError}) {
   const [busy,setBusy] = useState(false);
   const [status,setStatus] = useState('');
   const [raw,setRaw] = useState('');
+  const [scanMode,setScanMode] = useState('local');
+  const [aiToken,setAiToken] = useState('');
   const lock = React.useRef(false);
   const field = (key,value) => setForm(prev => ({...prev,[key]:value}));
   const rows = expenses.filter(e => (mode === 'all' || e.date.startsWith(mode === 'month' ? month : year)) && (category === 'すべて' || e.category === category)).sort((a,b)=>b.date.localeCompare(a.date));
@@ -681,10 +704,20 @@ function ExpenseView({expenses, onSave, loadError}) {
   const scan = async event => {
     const file = event.target.files?.[0]; event.target.value='';
     if (!file || lock.current) return;
+    if (scanMode === 'ai' && !aiToken.trim()) {setStatus('AI解析の利用パスワードを入力してください。');return;}
     if (file.size > 25*1024*1024) {setStatus('写真は25MB以下を選んでください。');return;}
     lock.current=true; setBusy(true); setRaw(''); setStatus('読み取りを準備しています…');
     let worker, canvas, timer, finished = false;
     try {
+      if (scanMode === 'ai') {
+        setStatus('AIが解析しています…');
+        // Replace receipt fields together; an earlier receipt must not survive a failed scan.
+        setForm(prev=>({...prev,date:'',amount:'',payee:'',category:'その他'}));
+        const result = await analyzeExpenseImage(file, aiToken);
+        setForm(prev=>({...prev,...result}));
+        setStatus('AI解析が完了しました。日付・金額・支払先・分類を確認して保存してください。');
+        return;
+      }
       const task = async () => {
         const engine = await loadExpenseOCR();
         if (finished) return;
@@ -705,7 +738,7 @@ function ExpenseView({expenses, onSave, loadError}) {
       // Never retain a previous receipt's date/amount when recognition misses them.
       setForm(prev=>({...prev,date:parsed.date,amount:parsed.amount}));
       setStatus(text.trim() ? '読み取りました。日付・合計金額を確認し、支払先・分類などを入力して保存してください。空欄は手入力してください。' : '文字を読み取れませんでした。撮り直すか手入力してください。');
-    } catch {setStatus('写真を読み取れませんでした。通信や画像形式を確認して再試行するか、手入力してください。');}
+    } catch (error) {setStatus(scanMode === 'ai' ? `${error.name === 'TimeoutError' ? 'AI解析がタイムアウトしました。' : error.message} 端末内の読み取りや手動入力も利用できます。` : '写真を読み取れませんでした。通信や画像形式を確認して再試行するか、手入力してください。');}
     finally {finished=true; clearTimeout(timer); lock.current=false; if(worker) await worker.terminate().catch(()=>{}); if(canvas){canvas.width=0;canvas.height=0;} setBusy(false);}
   };
   return <>
@@ -714,11 +747,15 @@ function ExpenseView({expenses, onSave, loadError}) {
     <form class="card" onSubmit={save} id="expense-form">
       <h3 style={{marginBottom:16}}>{form.id ? '経費を編集' : '経費を追加'}</h3>
       <fieldset disabled={busy || !!loadError} style={{border:0,minWidth:0}}>
+        <label>写真の読み取り方法<select aria-label="写真の読み取り方法" value={scanMode} onChange={e=>setScanMode(e.target.value)}>
+          <option value="local">端末内で読み取る</option><option value="ai">AIで解析する</option>
+        </select></label>
+        {scanMode === 'ai' && <label>AI解析の利用パスワード<input aria-label="AI解析の利用パスワード" type="password" autoComplete="off" value={aiToken} onChange={e=>setAiToken(e.target.value)} /></label>}
         <div class="grid-2" style={{marginBottom:12}}>
           <label class="add-btn" style={{textAlign:'center',fontSize:16}}>📷 撮影する<input aria-label="レシートを撮影" type="file" accept="image/*" capture="environment" onChange={scan} style={{display:'none'}} /></label>
           <label class="add-btn" style={{textAlign:'center',fontSize:16}}>写真を選ぶ<input aria-label="レシート写真を選択" type="file" accept="image/*" onChange={scan} style={{display:'none'}} /></label>
         </div>
-        <p style={{color:'var(--muted2)',fontSize:14,marginBottom:16}}>写真は端末内で読み取り、保存・送信しません。初回は読み取り用データの取得に時間がかかります。</p>
+        <p style={{color:'var(--muted2)',fontSize:14,marginBottom:16}}>{scanMode === 'ai' ? '選択した写真をCloudflare経由でGoogleへ送信して解析します。利用パスワードはこの画面を閉じると消えます。GoogleのAPIキーは入力しないでください。' : '写真は端末内で読み取り、保存・送信しません。初回は読み取り用データの取得に時間がかかります。'}</p>
         <div class="expense-date-amount" style={{marginBottom:12}}>
           <label>日付<input aria-label="経費の日付" type="date" required value={form.date} onChange={e=>field('date',e.target.value)} /></label>
           <label>金額（円）<input aria-label="経費の金額" type="number" inputMode="numeric" min="1" max="999999999" step="1" required value={form.amount} onChange={e=>field('amount',e.target.value)} /></label>
