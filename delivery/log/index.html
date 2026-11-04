@@ -907,12 +907,40 @@ function psolve(vault,p,date,target) {
   if(pscenario(vault,p,date,hi).landing<target)return null;
   let lo=0;while(lo<hi){let m=Math.floor((lo+hi)/2);if(pscenario(vault,p,date,m).landing>=target)hi=m;else lo=m+1;}return lo;
 }
+// Today's quota is the remaining quest count spread across remaining working days.
+function pquota(vault,p,date) {
+  return p.quests.filter(q=>q.aim!=='n'&&q.status==='n'&&date>=q.start&&date<=q.end).map(q=>{
+    const remaining=Math.max(0,pn(q.count)+(q.aim==='extra'?10:0)-pprogress(vault,q,date));
+    const days=pdays(date,q.finish==='n'?q.end:date).filter(d=>p.days[d]?.mode!=='off');
+    const today=p.days[date]?.mode==='off'?0:days.length?Math.ceil(remaining/days.length):0;
+    return {id:q.id,remaining,today,days:days.length,unallocated:days.length===0?remaining:0};
+  });
+}
+function prequirements(vault,goals,p,date,target) {
+  const off=p.days[date]?.mode==='off',day=pday(vault,date);
+  const countTarget=off?0:Math.ceil(p.days[date]?.mode==='cnt'?pn(p.days[date].value):pn(goals['D-'+date]?.cnt));
+  const countNeed=Math.max(0,countTarget-day.cnt),quotas=pquota(vault,p,date);
+  const uberNeed=Math.max(0,...quotas.map(q=>q.today));
+  const amountNeed=psolve(vault,p,date,target);
+  let questNeed=0,reason='';
+  if(uberNeed>0) {
+    if(p.calc.company==='d'||(p.calc.company==='both'&&pn(p.calc.share)===0)) {questNeed=null;reason='Uberノルマを満たせません。追加配達の会社・Uber比率を変更してください。';}
+    else {
+      let lo=0,hi=p.calc.company==='u'?uberNeed:Math.ceil((uberNeed+1)*100/pn(p.calc.share));
+      if(!Number.isSafeInteger(hi)) {questNeed=null;reason='Uber比率が小さすぎます。計算条件を変更してください。';}
+      else {while(lo<hi){const n=Math.floor((lo+hi)/2);if(pmix(p.calc,n).u>=uberNeed)hi=n;else lo=n+1;}questNeed=lo;}
+    }
+  }
+  if(amountNeed===null&&!reason)reason='売上目標の逆算には、使用する会社の通常単価を設定してください。';
+  const need=amountNeed===null||questNeed===null?null:Math.max(amountNeed,countNeed,questNeed);
+  return {countTarget,countNeed,quotas,uberNeed,amountNeed,questNeed,need,reason,hasRequirements:target>0||countTarget>0||quotas.some(q=>q.remaining>0)};
+}
 function psummary(vault,goals,p,date) {
   const w=pdistribute(vault,goals,p,date,'week',true),m=pdistribute(vault,goals,p,date,'month',true),manual=pfixed(p,date),g=goals['D-'+date],old=pn(typeof g==='object'?g?.amt:g);
   const target=p.days[date]?.mode==='off'?0:manual??(old||Math.max(w.goal?w.amountFor(date):0,m.goal?m.amountFor(date):0));
-  const actual=pamount(vault,p,date),remain=Math.max(0,target-actual),need=psolve(vault,p,date,target);
+  const actual=pamount(vault,p,date),remain=Math.max(0,target-actual),requirements=prequirements(vault,goals,p,date,target);
   const source=p.days[date]?.mode==='off'?'休み':manual!==null?(p.days[date]?.mode==='cnt'?'日別の件数指定':'日別の売上指定'):old>0?'日目標':w.goal||m.goal?(w.goal&&(!m.goal||w.amountFor(date)>=m.amountFor(date))?'週目標から自動配分':'月目標から自動配分'):'未設定';
-  return {w,m,target,actual,remain,need,source,hasGoal:target>0||manual!==null||old>0,manual:manual!==null||old>0};
+  return {...requirements,w,m,target,actual,remain,source,hasGoal:target>0||manual!==null||old>0,manual:manual!==null||old>0};
 }
 function ptime(cnt,uph){if(cnt===null||pn(uph)<=0)return '未設定';const min=Math.ceil(cnt/pn(uph)*60);return Math.floor(min/60)+'時間'+min%60+'分';}
 function Planner({view,vault,goals,date,p,onChange,navigate,error,onDateChange}) {
@@ -934,9 +962,11 @@ function Planner({view,vault,goals,date,p,onChange,navigate,error,onDateChange})
     const mix=pmix(p.calc,n),qdata=active.map(q=>({q,c:pprogress(vault,q,date,mix.u)}));
     const simulated=pscenario(vault,p,date,n).p;
     const qDelta=simulated.quests.reduce((a,q)=>a+pallocation(q,date),0)-p.quests.reduce((a,q)=>a+pallocation(q,date),0);
+    const requirements=prequirements(vault,goals,p,date,mode==='amt'&&money!==''?pn(money):sum.target);
     const ds=pday(vault,date),hours=pn(p.calc.uph)>0?ds.hours+n/pn(p.calc.uph):null;
     return <div className="card" key={i}><h3>{mode==='amt'?'目標達成まで あと'+n+'件':n===0?'今終了':`あと${n}件`}</h3>{mode==='cnt'&&i>0&&field('追加件数',p.scenarios[i],v=>change({...p,scenarios:p.scenarios.map((x,j)=>i===j?v:x)}),{step:1})}
-      <p>Uber {mix.u}件 ／ 出前館 {mix.d}件</p><p>通常売上 ＋{yen(mix.amt)}</p><strong>今日の計画着地 {yen(pamount(vault,simulated,date)+mix.amt)}</strong>
+      <p>Uber {mix.u}件 ／ 出前館 {mix.d}件</p>
+      <p>売上目標：{pscenario(vault,p,date,n).landing>=(mode==='amt'&&money!==''?pn(money):sum.target)?'達成見込み':'未達'} ／ 今日の件数目標：{n>=requirements.countNeed?'達成見込み':'未達'} ／ 本日のUberノルマ：{mix.u>=requirements.uberNeed?'達成見込み':'未達'}</p><p>通常売上 ＋{yen(mix.amt)}</p><strong>今日の計画着地 {yen(pamount(vault,simulated,date)+mix.amt)}</strong>
       <p>追加時間 {ptime(n,p.calc.uph)}</p><p>通常平均単価 {ds.cnt+n?yen((ds.real+mix.amt)/(ds.cnt+n)):'—'}</p><p>着地時給（計画配分込） {hours>0?yen((pamount(vault,simulated,date)+mix.amt)/hours):'—'}</p>
       {qdata.map(({q,c})=><p key={q.id}>Uberクエスト {c}件 ／ 基本まで{Math.max(0,pn(q.count)-c)}件 ／ 追加まで{Math.max(0,pn(q.count)+10-c)}件<br/>ここで期間終了なら報酬 {yen(preward(q,c))}<br/>{(()=>{const days=pdays(q.start,q.end).filter(d=>d>date&&p.days[d]?.mode!=='off');const remain=Math.max(0,pn(q.count)+(q.aim==='extra'?10:0)-c);return days.length?'期限まで残り'+days.length+'稼働日：Uber '+Math.ceil(remain/days.length)+'件/日（全体UPH換算の参考 '+ptime(Math.ceil(remain/days.length),p.calc.uph)+'）':remain?'期限内に残りUber '+remain+'件':'狙う回数に到達';})()}</p>)}
       <details><summary>明日以降への影響を見る</summary>{['week','month'].map(kind=>{const r=pdistribute(vault,goals,simulated,date,kind,false,mix.amt);return <div key={kind}><h4>{kind==='week'?'週間':'月間'}：明日以降</h4>{r.goal?<><p>残り{yen(r.remain)} ／ 稼働予定{r.future.length}日</p>{r.unallocated>0&&<p>未配分 {yen(r.unallocated)}</p>}{r.future.map(d=>{const amt=r.amountFor(d),alloc=simulated.quests.reduce((a,q)=>a+pallocation(q,d),0),nc=pneed(p.calc,Math.max(0,amt-alloc));return <p key={d}>{d.slice(5)}：{yen(amt)}・{nc===null?'件数未設定':nc+'件'}・{ptime(nc,p.calc.uph)}</p>;})}</>:<p>目標未設定</p>}</div>;})}
@@ -953,17 +983,19 @@ function Planner({view,vault,goals,date,p,onChange,navigate,error,onDateChange})
         <div className="today-heading"><h3>この日の目標と必要量</h3><span className="plan-badge">入力と連動</span></div>
         <label>逆算する営業日<input type="date" value={date} onChange={e=>e.target.value&&onDateChange(e.target.value)}/></label>
         <div className="today-target"><span>採用中：{sum.source}</span><strong>{sum.hasGoal?yen(sum.target):'未設定'}</strong></div>
-        <div className="plan-metrics"><div><span>目標まであと</span><strong>{blocked?'—':sum.hasGoal?yen(sum.remain):'—'}</strong></div><div><span>追加の配達</span><strong>{blocked||!sum.hasGoal?'—':sum.need===null?'単価を設定':sum.need+'件'}</strong></div><div><span>必要時間の目安</span><strong>{blocked||!sum.hasGoal?'—':sum.need===0?'0分':ptime(sum.need,p.calc.uph)}</strong></div></div>
+        <div className="plan-metrics"><div><span>目標まであと</span><strong>{blocked?'—':sum.hasGoal?yen(sum.remain):'—'}</strong></div><div><span>追加の配達</span><strong>{blocked||!sum.hasRequirements?'—':sum.need===null?'条件を確認':sum.need+'件'}</strong></div><div><span>必要時間の目安</span><strong>{blocked||!sum.hasRequirements?'—':sum.need===0?'0分':ptime(sum.need,p.calc.uph)}</strong></div></div>
+        <div className="plan-constraints" aria-label="本日の達成条件"><p>売上目標まで：{sum.hasGoal?yen(sum.remain):'未設定'} ／ 売上に必要な追加件数：{sum.amountNeed===null?'単価未設定':sum.amountNeed+'件'}</p><p>今日の件数目標：{sum.countTarget>0?sum.countTarget+'件（あと'+sum.countNeed+'件）':'未設定'}</p>{sum.quotas.map(q=><p key={q.id}>クエスト残り Uber {q.remaining}件 ／ 残り{q.days}稼働日 → 本日はあとUber {q.today}件{q.unallocated>0?'（稼働予定がなく、ノルマを配分できません）':''}</p>)}<p>追加件数は、売上・件数目標・本日のUberノルマをすべて満たす値です。</p></div>
+        {sum.reason&&<p role="alert">{sum.reason}</p>}
         <p>計画実績 {yen(sum.actual)}（クエスト配分 {yen(active.reduce((a,q)=>a+pallocation(q,date),0))} 込み）</p>
-        <details><summary>目標の決まり方・内訳</summary><p>休み → 日別の指定 → 日目標 → 週・月の自動配分の順に適用します。週と月の両方がある場合は、高い方を採用します。</p><p>週基準：{sum.w.goal?yen(sum.w.amountFor(date)):'未設定'} ／ 月基準：{sum.m.goal?yen(sum.m.amountFor(date)):'未設定'}</p><p>売上目標から必要件数を逆算します。目標件数は進捗管理用です。年目標は日別の自動配分に含みません。</p><p>クエスト報酬は達成前提の計画値です。目標欄の会計実績とは異なる場合があります。</p></details>
+        <details><summary>目標の決まり方・内訳</summary><p>休み → 日別の指定 → 日目標 → 週・月の自動配分の順に適用します。週と月の両方がある場合は、高い方を採用します。</p><p>週基準：{sum.w.goal?yen(sum.w.amountFor(date)):'未設定'} ／ 月基準：{sum.m.goal?yen(sum.m.amountFor(date)):'未設定'}</p><p>売上・今日の件数目標・本日のクエストノルマを同時に満たす必要件数を計算します。クエスト残数は今日を含む残り稼働日で均等配分し、最終日・今日で終了する想定では残り全件が必要です。週・月の件数目標、年目標は日別の自動配分に含みません。</p><p>クエスト報酬は達成前提の計画値です。目標欄の会計実績とは異なる場合があります。</p></details>
         {p.days[date]?.mode&&p.days[date].mode!=='auto'&&<p>この日は「{sum.source}」を優先しています。<button onClick={()=>change({...p,days:{...p.days,[date]:{mode:'auto',value:''}}})}>日・週・月の目標を使う</button></p>}
         {!sum.hasGoal&&<p>日・週・月の売上目標を設定すると、必要件数を計算します。</p>}
         {view==='goals'?<button className="gen-btn" onClick={()=>{setMode('amt');setMoney('');navigate('simulator');}}>この目標で逆算する →</button>:<button onClick={()=>navigate('goals')}>目標を編集する</button>}
       </div>
     </>}
     {view==='dashboard'&&(()=>{
-      const hasGoal=sum.target>0||sum.manual;
-      const cntGoal=pn(goals['D-'+date]?.cnt);
+      const hasGoal=sum.hasGoal;
+
       const percent=hasGoal&&sum.target>0?Math.min(100,Math.round(sum.actual/sum.target*100)):0;
       return <div className="card today-card">
         <div className="today-heading"><div><span className="today-eyebrow">TODAY / PLAN</span><h3>今日のゴール</h3></div><span className="today-date">{date.slice(5).replace('-',' / ')}</span></div>
@@ -971,8 +1003,9 @@ function Planner({view,vault,goals,date,p,onChange,navigate,error,onDateChange})
         {!blocked&&<>
           <div className="today-hero"><span>{hasGoal?(sum.remain>0?'目標まであと':'売上目標クリア'):'売上目標'}</span><div className={'today-amount '+(!hasGoal?'is-empty':'')}>{hasGoal?<>{Math.round(sum.remain).toLocaleString()}<small>円</small></>:'未設定'}</div></div>
           {hasGoal?<><div className="today-track"><span style={{width:percent+'%'}}/></div><div className="today-target"><span>{sum.manual?'設定した目標':'自動計算の目標'}</span><strong>{yen(sum.target)}</strong></div></>:<p className="today-empty">週・月の目標を設定すると、今日の必要量を計算します。</p>}
-          <div className="today-metrics"><div><span>必要件数</span><strong>{!hasGoal?'—':sum.need===null?'単価未設定':<>{sum.need}<small>件</small></>}</strong></div><div><span>必要時間</span><strong>{!hasGoal?'—':sum.need===0?'0分':ptime(sum.need,p.calc.uph)}</strong></div></div>
-          {cntGoal>0&&<div className="today-target"><span>今日の件数目標まで</span><strong>あと {Math.max(0,cntGoal-day.cnt)}件</strong></div>}
+          <div className="today-metrics"><div><span>必要件数</span><strong>{!sum.hasRequirements?'—':sum.need===null?'条件を確認':<>{sum.need}<small>件</small></>}</strong></div><div><span>必要時間</span><strong>{!sum.hasRequirements?'—':sum.need===0?'0分':ptime(sum.need,p.calc.uph)}</strong></div></div>
+          {sum.reason&&<p role="alert">{sum.reason}</p>}{sum.quotas.map(q=><p key={q.id}>本日のクエストノルマ：あとUber {q.today}件（期間残り{q.remaining}件／{q.days}稼働日）{q.unallocated>0?'・稼働予定なし':''}</p>)}
+          {sum.countTarget>0&&<div className="today-target"><span>今日の件数目標まで</span><strong>あと {sum.countNeed}件</strong></div>}
           {active.map(q=>{const c=pprogress(vault,q,date),target=pn(q.count)+(q.aim==='extra'?10:0),left=Math.max(0,target-c);return <div className="today-quest" key={q.id}><div className="today-quest-head"><span><i/>Uber Eats クエスト</span><strong>{q.aim==='n'?'計画対象外':left?'あと '+left+'件':'目標回数に到達'}</strong></div><div className="today-quest-progress"><strong>{c}<small> / {target}件</small></strong><span>{q.aim==='extra'?'追加10回まで':q.aim==='n'?'未選択':'基本回数まで'}</span></div><div className="today-track quest-track"><span style={{width:Math.min(100,target?c/target*100:0)+'%'}}/></div><div className="today-quest-foot">期限 {pdate(q.end,1).slice(5).replace('-','/')} 04:00</div></div>;})}
         </>}
         <div className="today-actions"><button className="gen-btn" onClick={()=>navigate('simulator')}>逆算する <span>↗</span></button><button className="today-edit" onClick={()=>navigate('goals')}>目標を設定・編集</button></div>
@@ -984,8 +1017,8 @@ function Planner({view,vault,goals,date,p,onChange,navigate,error,onDateChange})
     {field('対象外件数（Uber累計から控除）',q.adjust,v=>qchange(q.id,'adjust',v),{step:1})}
     <label>期間終了後の結果<select value={q.status} onChange={e=>qchange(q.id,'status',e.target.value)}><option value="n">計画中</option><option value="base">基本達成</option><option value="extra">追加達成</option><option value="miss">未達</option></select></label><details><summary>実績に入力済みの日跨ぎ報酬を紐付ける</summary><p>入力済みUberクエスト報酬のうち、このクエスト分だけを指定。計画での重複を除きます。</p>{q.links.map((l,i)=><div key={i}><input type="date" value={l.date} onChange={e=>e.target.value&&qchange(q.id,'links',q.links.map((v,j)=>i===j?{...v,date:e.target.value}:v))}/>{field('記録済み金額',l.amount,v=>qchange(q.id,'links',q.links.map((l,j)=>i===j?{...l,amount:v}:l)))}<button onClick={()=>qchange(q.id,'links',q.links.filter((_,j)=>i!==j))}>紐付け解除</button></div>)}<button onClick={()=>qchange(q.id,'links',[...q.links,{date,amount:0}])}>紐付けを追加</button></details><button className="del-btn" onClick={()=>{if(confirm('このクエスト設定を削除しますか？実績は保持します。'))change({...p,quests:p.quests.filter(v=>v.id!==q.id)});}}>設定を削除</button></div>)}</>}
     {view==='simulator'&&<><h2>逆算シミュレーター</h2><div className="card"><h3>計算条件</h3><p>単価と1時間あたりの配達件数を設定してください。</p><label>追加配達の会社<select value={p.calc.company} onChange={e=>calc('company',e.target.value)}><option value="u">Uber中心（追加はUber）</option><option value="d">出前館中心（追加は出前館）</option><option value="both">両方</option></select></label>{p.calc.company==='both'&&field('Uber件数比率（%）',p.calc.share,v=>calc('share',v),{max:100})}<div className="grid-2">{field('Uber通常単価（円）',p.calc.u,v=>calc('u',v))}{field('出前館通常単価（円）',p.calc.d,v=>calc('d',v))}</div>{field('全体UPH（件/時）',p.calc.uph,v=>calc('uph',v))}<p>今日の通常単価：Uber {day.u.cnt?yen(day.u.amt/day.u.cnt):'—'} ／ 出前館 {day.d.cnt?yen(day.d.amt/day.d.cnt):'—'}</p><button onClick={()=>change({...p,calc:{...p.calc,u:day.u.cnt?Math.round(day.u.amt/day.u.cnt):p.calc.u,d:day.d.cnt?Math.round(day.d.amt/day.d.cnt):p.calc.d}})}>この実績単価を使う</button><label>季節モデル<select value={p.model} onChange={e=>change({...p,model:Number(e.target.value)})}>{p.models.map((m,i)=><option value={i} key={i}>{m.name}</option>)}</select></label><button onClick={()=>change({...p,calc:{...p.calc,u:p.models[p.model].u,d:p.models[p.model].d,uph:p.models[p.model].uph}})}>単価・UPHの組を使う</button></div>
-    <div className="card"><label>比較方法<select value={mode} onChange={e=>setMode(e.target.value)}><option value="cnt">あと何件</option><option value="amt">あと何円（配分込の目標まで）</option></select></label>{mode==='amt'&&<><p>{money===''?'設定した目標と連動中':'一時的な目標で試算中（保存した目標は変更しません）'}</p>{field('試算用の着地目標（空欄なら連動中の目標）',money,setMoney)}{money!==''&&<button onClick={()=>setMoney('')}>設定した目標に戻す</button>}</>}{active.map(q=><label key={q.id}>クエストの期間を今日で終了する想定<select value={q.finish} onChange={e=>qchange(q.id,'finish',e.target.value)}><option value="n">明日以降も継続</option><option value="base">今日で終了として比較</option></select></label>)}</div>
-    {!blocked&&(mode==='amt'&&money===''&&!sum.hasGoal?<p>目標管理で売上目標を設定してください。</p>:!pready(p.calc)?<p>使用する会社の通常単価を設定してください。</p>:mode==='cnt'?<div className="planner-results">{p.scenarios.map((n,i)=>resultCard(Math.floor(pn(n)),i))}</div>:(()=>{const n=psolve(vault,p,date,money===''?sum.target:pn(money));return n===null?<p>単価を設定してください。</p>:resultCard(n,0);})())}
+    <div className="card"><label>比較方法<select value={mode} onChange={e=>setMode(e.target.value)}><option value="cnt">あと何件</option><option value="amt">目標とクエストから必要件数を逆算</option></select></label>{mode==='amt'&&<><p>{money===''?'設定した目標と連動中':'一時的な目標で試算中（保存した目標は変更しません）'}</p>{field('試算用の着地目標（空欄なら連動中の目標）',money,setMoney)}{money!==''&&<button onClick={()=>setMoney('')}>設定した目標に戻す</button>}</>}{active.map(q=><label key={q.id}>クエストの期間を今日で終了する想定<select value={q.finish} onChange={e=>qchange(q.id,'finish',e.target.value)}><option value="n">明日以降も継続</option><option value="base">今日で終了として比較</option></select></label>)}</div>
+    {!blocked&&(mode==='amt'&&money===''&&!sum.hasRequirements?<p>目標管理で売上・件数目標またはクエストを設定してください。</p>:mode==='cnt'&&!pready(p.calc)?<p>使用する会社の通常単価を設定してください。</p>:mode==='cnt'?<div className="planner-results">{p.scenarios.map((n,i)=>resultCard(Math.floor(pn(n)),i))}</div>:(()=>{const r=prequirements(vault,goals,p,date,money===''?sum.target:pn(money));return r.need===null?<p role="alert">{r.reason}</p>:resultCard(r.need,0);})())}
     <p>通常売上と配分額は計画値です。会計の実績は変更しません。</p></>}
     {view==='settings'&&<div className="card"><h2>単価・UPHのプリセット</h2>{p.models.map((m,i)=><div key={i}><h3>{m.name}</h3><div className="grid-3">{['u','d','uph'].map((k,j)=>field(['Uber単価','出前館単価','UPH'][j],m[k],v=>change({...p,models:p.models.map((x,z)=>z===i?{...x,[k]:v}:x)})))}</div></div>)}</div>}
   </section>;
