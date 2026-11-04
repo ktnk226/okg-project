@@ -494,6 +494,7 @@
     .sim-tabs span {display:block;font-size:13px;font-weight:500;}
     .sim-period {display:flex;align-items:center;justify-content:space-between;gap:12px;margin:16px 0;}
     .sim-period strong {font-size:20px;}
+    .simulation input[type="date"],.simulation input[type="month"] {display:block;min-width:0;max-width:100%;color-scheme:dark;-webkit-appearance:none;appearance:none;}
     .sim-period-input {display:flex;align-items:center;gap:12px;margin-bottom:18px;}
     .sim-period-input label {flex:1;margin:0;max-width:320px;min-width:0;}
     .sim-period-input button {margin-top:25px;}
@@ -941,7 +942,7 @@ function ExpenseView({expenses, onSave, loadError}) {
 function SimProgress({actual,goal,forecast=0,label='売上の進捗'}) {
   const max=Math.max(goal,actual+forecast,1);
   return <div className="sim-progress" role="img" aria-label={`${label}：実績 ${actual.toLocaleString()}円、目標 ${goal.toLocaleString()}円、見込み ${forecast.toLocaleString()}円`}>
-    <span className="sim-progress-actual" style={{width:(actual/max*100)+'%'}}/>
+    <span className="sim-progress-actual" style={{width:(Math.max(0,actual)/max*100)+'%'}}/>
     <span className="sim-progress-forecast" style={{width:(forecast/max*100)+'%'}}/>
   </div>;
 }

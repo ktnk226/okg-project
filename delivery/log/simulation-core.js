@@ -48,7 +48,9 @@ function pvalidate(p) {
 function pload() {try {const raw=localStorage.getItem(PLAN_KEY);return {data:raw?pvalidate(JSON.parse(raw)):pdefault(),error:''};}catch{return {data:pdefault(),error:'計画データを読み込めません。既存データを保護して保存を停止しています。バックアップから復元してください。'};}}
 function pday(vault,date) {
   const day=vault[date]||{},s=(day.sets||[]).slice(-1)[0]||{};
-  const pf=k=>({amt:pn(s[k+'_cum']),cnt:pn(s[k+'_cnt_cum']),que:pn(s[k+'_que_cum'])});
+  // Accounting totals retain signed corrections, just like Home's aggregation.
+  const recorded=v=>Number.isFinite(Number(v))?Number(v):0;
+  const pf=k=>({amt:recorded(s[k+'_cum']),cnt:recorded(s[k+'_cnt_cum']),que:recorded(s[k+'_que_cum'])});
   const u=pf('u'),d=pf('d'),all=['u','d','r','m'].map(pf),real=all.reduce((a,x)=>a+x.amt,0),que=all.reduce((a,x)=>a+x.que,0);
   return {u,d,real,que,total:real+que,cnt:all.reduce((a,x)=>a+x.cnt,0)};
 }
@@ -63,7 +65,7 @@ function plinkCheck(p,vault) {
 function pquestMoney(vault,p,asOf) {
   // Claim each recorded yen once. Explicit links take priority; the remaining
   // Uber rewards recorded in a quest's own period reduce its forecast automatically.
-  const available=Object.fromEntries(Object.keys(vault).map(d=>[d,pday(vault,d).u.que]));
+  const available=Object.fromEntries(Object.keys(vault).map(d=>[d,pn(pday(vault,d).u.que)]));
   const recorded=Object.fromEntries(p.quests.map(q=>[q.id,0]));
   for(const q of p.quests)for(const l of q.links){const n=Math.min(available[l.date]||0,pn(l.amount));available[l.date]=(available[l.date]||0)-n;recorded[q.id]+=n;}
   return [...p.quests].sort((a,b)=>a.start.localeCompare(b.start)).map(q=>{

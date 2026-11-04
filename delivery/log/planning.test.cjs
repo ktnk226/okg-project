@@ -92,3 +92,8 @@ test('year boundaries retain existing week keys',()=>{
  assert.equal(c.pgoalKey('2027-01-01','week'),c.pgoalKey('2026-12-28','week'));const g=c.psetGoal({},'2027-01-01','week',70000);assert.equal(week(plan(),{},g,'2027-01-01','2026-12-28').goal,70000);
  assert.equal(c.pgoalKey(date,'month'),'M-2026-11');assert.equal(c.pgoalKey(date,'year'),'Y-2026');
 });
+test('signed accounting corrections match Home totals and do not create negative reward claims',()=>{
+ const p=plan();p.quests=[quest()];const v={[date]:{sets:[{u_cum:1000,d_cum:-200,r_cum:300,m_cum:0,u_que_cum:-100}]}};
+ assert.equal(c.pday(v,date).total,1000);assert.equal(c.phorizon(v,{},p,date,'month',date).actual,1000);assert.equal(c.phorizon(v,{},p,date,'year',date).actual,1000);
+ assert.equal(c.pquestMoney(v,p,date)[0].recorded,0);assert.equal(c.pquestMoney(v,p,date)[0].pending,2000);
+});

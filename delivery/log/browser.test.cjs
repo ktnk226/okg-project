@@ -9,7 +9,7 @@ const date='2026-11-06';
 const keys={db:'delivery_log_vault_v13',goals:'delivery_log_periodic_goals_v13',planning:'delivery_log_planning_v15',memos:'delivery_log_inbox_memos_v13',expenses:'delivery_log_expenses_v1'};
 fs.mkdirSync(output,{recursive:true});
 async function run(browser,mobile){
- const context=await browser.newContext({...mobile?devices['iPhone 13']:{viewport:{width:1440,height:1000}},timezoneId:'Asia/Tokyo',acceptDownloads:true});
+ const context=await browser.newContext({...mobile?devices['iPhone 13']:{viewport:{width:1440,height:1000}},timezoneId:'Asia/Tokyo',locale:'ja-JP',acceptDownloads:true});
  const page=await context.newPage(),errors=[];page.setDefaultTimeout(12000);page.on('pageerror',e=>errors.push(e.message));page.on('dialog',d=>d.accept());
  await page.clock.install({time:new Date('2026-11-06T03:00:00Z')});
  if(process.env.DELILOG_TEST_ASSETS){await page.route('https://cdnjs.cloudflare.com/**',r=>r.fulfill({path:path.join(process.env.DELILOG_TEST_ASSETS,r.request().url().includes('/react-dom/')?'react-dom.js':r.request().url().includes('/react/')?'react.js':'babel.js'),contentType:'text/javascript'}));await page.route('https://fonts.googleapis.com/**',r=>r.fulfill({body:'',contentType:'text/css'}));}
