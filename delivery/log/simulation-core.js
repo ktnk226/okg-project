@@ -32,7 +32,8 @@ function pvalidate(p) {
   if(!obj(p)||!Array.isArray(p.quests)||!obj(p.days)||!Array.isArray(p.models)||p.models.length!==3||!obj(p.calc)||!Array.isArray(p.scenarios)||p.scenarios.length!==3)throw Error('計画データの形式が違います');
   if(!['u','d','both'].includes(p.calc.company)||!['u','d','uph','share'].every(k=>number(p.calc[k]))||pn(p.calc.share)>100||!Number.isInteger(p.model)||p.model<0||p.model>2||!p.scenarios.every(v=>number(v)&&Number.isInteger(Number(v)))||Number(p.scenarios[0])!==0)throw Error('計算条件が不正です');
   if(!p.models.every(m=>obj(m)&&typeof m.name==='string'&&['u','d','uph'].every(k=>number(m[k]))))throw Error('モデルが不正です');
-  if(p.calc.strategy!==undefined&&!['ratio','quest'].includes(p.calc.strategy))throw Error('計画方式が不正です');
+  if(p.calc.strategy!==undefined&&!['ratio','quest','counts'].includes(p.calc.strategy))throw Error('計画方式が不正です');
+  for(const k of ['uCount','dCount'])if(p.calc[k]!==undefined&&(!number(p.calc[k])||!Number.isInteger(Number(p.calc[k]))))throw Error('計画件数は0以上の整数で入力してください');
   const ids=new Set();
   for(const q of p.quests) {
     if(!obj(q)||typeof q.id!=='string'||ids.has(q.id)||!day(q.start)||!day(q.end)||q.end<q.start||pdays(q.start,q.end).length>4||!['n','base','extra'].includes(q.aim)||!['n','base','extra'].includes(q.finish)||!['n','base','extra','miss'].includes(q.status)||!['count','base','extra','adjust'].every(k=>number(q[k]))||pn(q.count)<10||pn(q.count)>120||pn(q.count)%10||!Array.isArray(q.links))throw Error('クエスト条件が不正です');
@@ -94,7 +95,7 @@ function pweek(vault,goals,p,date,asOf) {
   const [start,end]=prange(date,'week'),dates=pdays(start,end),goal=pgoal(goals,date,'week');
   const actual=pactual(vault,start,end),quests=pquestMoney(vault,p,asOf).filter(x=>x.q.start<=end&&x.q.end>=start);
   const forecast=quests.reduce((a,x)=>a+x.pending,0),includeQuest=p.weekly?.[pgoalKey(date,'week')]?.includeQuest===true;
-  const credit=includeQuest||p.calc.strategy==='quest'?forecast:0,remain=Math.max(0,goal-actual),deliveryRemain=Math.max(0,remain-credit);
+  const credit=includeQuest||['quest','counts'].includes(p.calc.strategy)?forecast:0,remain=Math.max(0,goal-actual),deliveryRemain=Math.max(0,remain-credit);
   const rows=dates.map(d=>{
     const setting=pdaySetting(p,goals,d),actual=pday(vault,d).total,eligible=d>=asOf&&setting.mode!=='off';
     const fixed=setting.mode==='amt'?pn(setting.value):setting.mode==='cnt'?pmix(p.calc,Math.ceil(pn(setting.value))).amt:null;
@@ -134,7 +135,7 @@ function prequirements(vault,p,date,target,setting={mode:'auto'}) {
 }
 function psummary(vault,goals,p,date) {
   const w=pweek(vault,goals,p,date,date),row=w.rows.find(r=>r.date===date),target=row.target,actual=row.actual;
-  const company=p.calc.strategy==='quest'?pcompanyPlan(vault,goals,p,date,date):null,planned=company?.rows.find(r=>r.date===date);
+  const company=pselectedPlan(vault,goals,p,date,date),planned=company?.rows.find(r=>r.date===date);
   return {...prequirements(vault,p,date,target,row.setting),...(company?{need:planned.need,reason:company.reason,uberNeed:planned.u}:{}),w,target,actual,remain:row.remaining,hasGoal:w.goal>0||row.fixed!==null,off:row.setting.mode==='off',manual:row.fixed!==null};
 }
 function phorizon(vault,goals,p,date,kind,asOf) {
@@ -170,4 +171,19 @@ function pcompanyPlan(vault,goals,p,date,asOf,baseline=true) {
     capacity=original.rows.filter(r=>r.eligible&&r.date>=asOf).reduce((n,r)=>n+Math.max(0,r.u-pday(vault,r.date).u.cnt)+Math.max(0,r.d-pday(vault,r.date).d.cnt),0);
   }
   return {w,rows,u,d,delivery,shortfall,unallocatedUber,unallocatedD,need:d===null?null:u+d,capacity,requiredAverage:capacity>0?delivery/capacity:null,reason:u>0&&pn(p.calc.u)<=0?'Uber通常単価を設定してください。':d===null?'出前館通常単価を設定してください。':''};
+}
+
+function pcountPlan(vault,goals,p,date,asOf) {
+  const minimum=pcompanyPlan(vault,goals,p,date,asOf),w=minimum.w;
+  const done=k=>pdays(w.start,w.end).reduce((n,d)=>n+pday(vault,d)[k].cnt,0);
+  const u=Math.max(minimum.u,Math.max(0,pn(p.calc.uCount)-done('u'))),d=Math.max(0,pn(p.calc.dCount)-done('d'));
+  const rows=minimum.rows.map(r=>({...r,d:0})),active=rows.filter(r=>r.eligible);
+  const spread=(n,key)=>{const part=active.length?Math.ceil(n/active.length):0;for(const r of active){const take=Math.min(n,part);r[key]+=take;n-=take;}return n;};
+  const unallocatedUber=minimum.unallocatedUber+spread(u-minimum.u,'u'),unallocatedD=spread(d,'d');
+  rows.forEach(r=>{r.need=r.u+r.d;r.hours=ptime(r.need,p.calc.uph);});
+  const delivery=Math.max(0,w.goal-w.actual-w.forecast),capacity=u+d,estimated=u*pn(p.calc.u)+d*pn(p.calc.d);
+  return {...minimum,rows,u,d,need:capacity,delivery,capacity,requiredAverage:capacity?delivery/capacity:null,shortfall:Math.max(0,delivery-estimated),estimated,unallocatedUber,unallocatedD,reason:!capacity&&delivery>0?'会社別の計画件数を入力してください。':''};
+}
+function pselectedPlan(vault,goals,p,date,asOf) {
+  return p.calc.strategy==='counts'?pcountPlan(vault,goals,p,date,asOf):p.calc.strategy==='quest'?pcompanyPlan(vault,goals,p,date,asOf):null;
 }

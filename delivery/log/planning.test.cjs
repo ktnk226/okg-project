@@ -108,3 +108,10 @@ test('quest-first example, actual revenue, deadlines, holidays and decimal UPH p
  const poor=c.pcompanyPlan({[date]:{sets:[{u_cum:1000,u_cnt_cum:2}]}},g,p,date,'2026-11-07');assert.ok(poor.requiredAverage>c.pcompanyPlan({},g,p,date,date).requiredAverage);
  storage.set('delivery_log_planning_v15',before);const restored=c.pload().data;assert.equal(Number(restored.calc.uph),3.2);assert.equal(Number(restored.models[1].uph),3.5);assert.equal(c.ptime(35,restored.models[1].uph),'10時間0分');assert.equal(JSON.stringify(c.pvalidate(JSON.parse(before))),before);
 });
+test('absolute company counts are not weights and survive storage',()=>{
+ const p=plan();p.calc={...p.calc,strategy:'counts',u:320,d:400,uph:3.2,uCount:100,dCount:15};p.quests=[quest({count:100,base:12000})];const g=c.psetGoal({},date,'week',50000);
+ let r=c.pselectedPlan({},g,p,date,date);assert.equal(r.u,100);assert.equal(r.d,15);assert.equal(r.estimated,38000);assert.equal(r.shortfall,0);
+ r=c.pselectedPlan({[date]:{sets:[{u_cnt_cum:34,d_cnt_cum:5,u_cum:10880,d_cum:2000}]}},g,p,date,'2026-11-07');assert.equal(r.u,66);assert.equal(r.d,10);
+ p.calc.dCount=0;r=c.pselectedPlan({},g,p,date,date);assert.equal(r.d,0);assert.equal(r.shortfall,6000);assert.equal(r.requiredAverage,380);
+ p.calc.uCount=10;assert.equal(c.pselectedPlan({},g,p,date,date).u,100);assert.equal(c.pvalidate(JSON.parse(JSON.stringify(p))).calc.uCount,10);
+});
