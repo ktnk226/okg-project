@@ -9,9 +9,9 @@ function dailyMinutes(u,d,conditions) {
   return Math.ceil((u/(conditions.u.uph||1)+d/(conditions.d.uph||1))*60);
 }
 function dailyTime(minutes) {return minutes===null?'UPH未設定':Math.floor(minutes/60)+'時間'+minutes%60+'分';}
-function dailyPeriod(vault,goals,p,date,cursor,range) {
+function dailyPeriod(vault,goals,p,date,cursor,range,rewardDate=cursor) {
   const settings={...p,calc:{...p.calc,strategy:'quest'}};
-  const w=pweek(vault,goals,settings,date,cursor,range);
+  const w=pweek(vault,goals,settings,date,cursor,range,rewardDate);
   const fill=p.dailyPeriods?.[range[0]]?.fill||'d';
   const rows=w.rows.map(r=>{
     const conditions={u:dailyCondition(p,r.date,'u'),d:dailyCondition(p,r.date,'d')};
@@ -64,7 +64,7 @@ function dailyPlan(vault,goals,p,date,today) {
     const original=dailyPeriod(past,goals,p,date,today,range);
     const snapshot=p.applied?.[today];
     if(snapshot&&today>=range[0]&&today<=range[1]){
-      const reflected=dailyPeriod({...past,[today]:snapshot.record},goals,p,date,pdate(today,1),range);
+      const reflected=dailyPeriod({...past,[today]:snapshot.record},goals,p,date,pdate(today,1),range,today);
       original.rows=original.rows.map(r=>r.date>today?reflected.rows.find(x=>x.date===r.date):r);
       original.reflected=reflected;
     }

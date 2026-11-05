@@ -98,10 +98,10 @@ function pdaySetting(p,goals,date) {
   const old=goals['D-'+date],amt=pn(typeof old==='object'?old?.amt:old),cnt=pn(old?.cnt);
   return amt>0?{mode:'amt',value:amt,legacy:true}:cnt>0?{mode:'cnt',value:cnt,legacy:true}:{mode:'auto',value:''};
 }
-function pweek(vault,goals,p,date,asOf,range=null) {
-  if(!range&&phasSplit(goals,date))return pmergeParts(ppartRanges(goals,date).map(r=>pweek(vault,goals,p,date,asOf,r)));
+function pweek(vault,goals,p,date,asOf,range=null,rewardDate=asOf) {
+  if(!range&&phasSplit(goals,date))return pmergeParts(ppartRanges(goals,date).map(r=>pweek(vault,goals,p,date,asOf,r,rewardDate)));
   const [start,end]=range||prange(date,'week'),dates=pdays(start,end),goal=range?range[2]:pgoal(goals,date,'week');
-  const actual=pactual(vault,start,end),quests=pquestMoney(vault,p,asOf).filter(x=>range?x.q.end>=start&&x.q.end<=end:x.q.start<=end&&x.q.end>=start);
+  const actual=pactual(vault,start,end),quests=pquestMoney(vault,p,rewardDate).filter(x=>range?x.q.end>=start&&x.q.end<=end:x.q.start<=end&&x.q.end>=start);
   const forecast=quests.reduce((a,x)=>a+x.pending,0),includeQuest=p.weekly?.[pgoalKey(date,'week')]?.includeQuest===true;
   const credit=includeQuest||['quest','counts'].includes(p.calc.strategy)?forecast:0,remain=Math.max(0,goal-actual),deliveryRemain=Math.max(0,remain-credit);
   const rows=dates.map(d=>{

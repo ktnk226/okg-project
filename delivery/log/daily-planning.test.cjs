@@ -64,3 +64,7 @@ test('missing fares and UPH remain explicitly unresolved rather than a zero-time
 test('manual daily money targets also guide automatic company counts',()=>{
  const p=plan();p.calc.d=500;p.days[day]={mode:'amt',value:8000};const r=back({},goals(),p);assert.deepEqual(Array.from(r.rows,x=>x.target),[8000,11000,11000]);assert.deepEqual(Array.from(r.rows,x=>x.d),[16,22,22]);
 });
+test('applying on the final day does not expire the quest or imply work is finished',()=>{
+ const p=plan();p.quests=[q()];const today='2026-11-08',v={[today]:entry(42000,120)},next=c.dailyApply(v,p,today);
+ const r=back(v,goals(60000),next,today);assert.equal(r.reflected.w.forecast,13000);assert.equal(r.reflected.delivery,5000);assert.equal(r.reflected.rows.filter(x=>x.eligible).length,0);assert.equal(r.rows[2].eligible,true);assert.equal(r.rows[2].target,47000);assert.equal(c.dailySummary(v,goals(60000),next,today).remain,5000);
+});
