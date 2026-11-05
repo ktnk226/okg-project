@@ -115,3 +115,16 @@ test('absolute company counts are not weights and survive storage',()=>{
  p.calc.dCount=0;r=c.pselectedPlan({},g,p,date,date);assert.equal(r.d,0);assert.equal(r.shortfall,6000);assert.equal(r.requiredAverage,380);
  p.calc.uCount=10;assert.equal(c.pselectedPlan({},g,p,date,date).u,100);assert.equal(c.pvalidate(JSON.parse(JSON.stringify(p))).calc.uCount,10);
 });
+test('split goals sum, independent money allocation, off days and prior shortfalls',()=>{
+ let g=c.psetPart({},date,'front',30000);g=c.psetPart(g,date,'back',50000);assert.equal(c.pgoal(g,date,'week'),80000);assert.equal(g[c.pgoalKey(date,'week')].amt,80000);
+ const p=plan();let w=c.pweek({},g,p,date,'2026-11-02');assert.equal(w.parts[0].rows[0].target,7500);assert.deepEqual(Array.from(w.parts[1].rows,r=>r.target),[16667,16667,16666]);
+ p.days['2026-11-03']={mode:'off',value:''};w=c.pweek({},g,p,date,'2026-11-02');assert.equal(w.rows[1].target,0);assert.equal(w.rows[0].target,10000);
+ w=c.pweek({'2026-11-02':log(2)},g,p,date,date);assert.equal(w.parts[0].unallocated,29000);assert.deepEqual(Array.from(w.parts[1].rows,r=>r.target),[16667,16667,16666]);
+ assert.equal(c.pgoal(JSON.parse(JSON.stringify(g)),date,'week'),80000);assert.equal(c.pgoal(c.psetPart(g,date,'front',20000),date,'week'),70000);
+});
+test('split company plans use each period rewards and revenue, with no reward double count',()=>{
+ let g=c.psetPart({},date,'front',10000);g=c.psetPart(g,date,'back',50000);const p=plan();p.calc={...p.calc,strategy:'quest',u:320,d:400,uph:3.2};p.quests=[quest({count:100,base:12000})];
+ let r=c.pselectedPlan({},g,p,date,date);assert.equal(r.parts[1].u,100);assert.equal(r.parts[1].d,15);assert.equal(r.parts[0].w.forecast,0);assert.equal(r.parts[1].w.forecast,12000);
+ const v={[date]:{sets:[{u_cum:15000,u_cnt_cum:34,u_que_cum:12000}]}};r=c.pselectedPlan(v,g,p,date,'2026-11-07');assert.equal(r.parts[1].w.forecast,0);assert.equal(r.parts[1].u,66);assert.equal(r.parts[1].d,5);
+ p.calc.strategy='counts';p.calc.uCount=100;p.calc.dCount=15;r=c.pselectedPlan({},g,p,date,'2026-11-02');assert.equal(r.parts[0].d+r.parts[1].d,15);assert.equal(r.parts[1].u,100);assert.equal(r.u,100);assert.equal(c.psummary({},g,p,date).target,12667);
+});

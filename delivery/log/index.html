@@ -596,7 +596,7 @@
 <body>
 <div id="root"></div>
 
-<script src="./simulation-core.js?v=18"></script>
+<script src="./simulation-core.js?v=19"></script>
 <script type="text/babel">
 const { useState, useMemo, useEffect, useCallback } = React;
 
@@ -995,11 +995,12 @@ function Planner({view,vault,goals,date,p,onChange,onGoalsChange,navigate,error,
       {blocked&&<p className="sim-warning" role="alert">{blocked}</p>}
       <fieldset className="sim-fields" disabled={!!error}>
         <div className="card sim-overview">
-          <div className="grid-2">{field((tab==='week'?'週':tab==='month'?'月':'年')+'の売上目標（円）',goal||'',updateGoal,{placeholder:'目標を入力', 'data-testid':'simulation-goal'})}<div className="sim-goal-note">{tab==='week'?'実績と稼働予定に応じて、残りの日へ配分します。':'この目標・想定を変更しても、週の日別配分は変わりません。'}</div></div>
+          <div className="grid-2">{tab==='week'?<div><div className="grid-2">{field('前半目標（月〜木・円）',pgoalParts(goals,simDate).front||'',v=>onGoalsChange(psetPart(goals,simDate,'front',v)),{'data-testid':'front-goal'})}{field('後半目標（金〜日・円）',pgoalParts(goals,simDate).back||'',v=>onGoalsChange(psetPart(goals,simDate,'back',v)),{'data-testid':'back-goal'})}</div><p>週全体の目標（前半＋後半）：<strong data-testid="simulation-goal">{yen(goal)}</strong></p>{!phasSplit(goals,simDate)&&<p className="sim-note">既存の週目標を保持しています。表示は4日・3日の仮内訳です。前半または後半を編集すると、期間別の配分に切り替わります。</p>}</div>:field((tab==='month'?'月':'年')+'の売上目標（円）',goal||'',updateGoal,{placeholder:'目標を入力', 'data-testid':'simulation-goal'})}<div className="sim-goal-note">{tab==='week'?'前半・後半それぞれの目標を基準に配分します。期間間の未達・超過は自動移動しません。':'この目標・想定を変更しても、週の日別配分は変わりません。'}</div></div>
           <div className="sim-stats"><div><span>入力済み実績</span><strong data-testid="simulation-actual">{yen(actual)}</strong></div><div><span>目標までの不足額</span><strong data-testid="simulation-deficit">{goal?yen(Math.max(0,goal-actual)):'—'}</strong></div><div><span>達成率</span><strong>{goal?Math.round(actual/goal*100)+'%':'—'}</strong></div></div>
           <SimProgress actual={actual} goal={goal}/><div className="sim-legend"><span className="actual-dot">実績</span><span>目標 {yen(goal)}</span><span>不足 {goal?yen(Math.max(0,goal-actual)):'—'}</span></div>
         </div>
         {tab==='week'?<>
+          {week.parts&&<div className="grid-2">{week.parts.map((part,i)=><div className="card" key={i}><h3>{i===0?'前半（月〜木）':'後半（金〜日）'}</h3><p>目標 {yen(part.goal)} ／ 実績 {yen(part.actual)}</p><p>不足 {yen(part.remain)} ／ 配達で必要 {yen(part.deliveryRemain)}</p><SimProgress actual={part.actual} goal={part.goal}/>{part.unallocated>0&&<p className="sim-warning">未配分 {yen(part.unallocated)}。この期間の稼働予定または目標を確認してください。</p>}</div>)}</div>}
           <div className="card"><div className="sim-heading"><h3>日別の配分</h3><span className="sim-tag">ホームと連動</span></div>
             <p className="sim-note">金額を指定すると、その差額をほかの「自動配分」の稼働日へ均等に振り分けます。過去の日と休みの日には配分しません。</p>
             <div className="sim-bars" role="img" aria-label="日別の実績と残り配分">{week.rows.map(r=>{const max=Math.max(...week.rows.map(x=>Math.max(x.actual,x.target)),1);return <div className={'sim-bar-column '+(r.date===today?'is-today':'')} key={r.date}><span>{formatSmartAmt(r.target||r.actual)||'0円'}</span><div className="sim-bar-well"><div className="sim-bar-fill" style={{height:Math.max(r.actual,r.target)/max*100+'%'}}><i style={{height:Math.min(100,r.actual/Math.max(r.target,r.actual,1)*100)+'%'}}/></div></div><strong>{['日','月','火','水','木','金','土'][new Date(r.date+'T12:00:00').getDay()]}</strong><small>{r.setting.mode==='off'?'休み':r.date.slice(5).replace('-','/')}</small></div>;})}</div>

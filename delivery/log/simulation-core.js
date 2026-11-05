@@ -19,7 +19,13 @@ function pgoalKey(date,kind) {
   const week=Math.ceil(((Math.round((mon-jan)/86400000))+jan.getDay()+1)/7);
   return 'W-'+y+'-W'+String(week).padStart(2,'0');
 }
-function pgoal(goals,date,kind) {const v=goals[pgoalKey(date,kind)];return pn(typeof v==='object'?v?.amt:v);}
+function phasSplit(goals,date) {const g=goals[pgoalKey(date,'week')];return g&&typeof g==='object'&&g.front!==undefined&&g.back!==undefined;}
+function pgoal(goals,date,kind) {const v=goals[pgoalKey(date,kind)];return kind==='week'&&phasSplit(goals,date)?pn(v.front)+pn(v.back):pn(typeof v==='object'?v?.amt:v);}
+function pgoalParts(goals,date) {const g=goals[pgoalKey(date,'week')],total=pgoal(goals,date,'week');return phasSplit(goals,date)?{front:pn(g.front),back:pn(g.back)}:{front:Math.round(total*4/7),back:total-Math.round(total*4/7)};}
+function psetPart(goals,date,part,value) {const key=pgoalKey(date,'week'),old=goals[key],parts={...pgoalParts(goals,date),[part]:pn(value)};return {...goals,[key]:{...(old&&typeof old==='object'?old:{cnt:0}),...parts,amt:parts.front+parts.back}};}
+function ppartRanges(goals,date) {const [a,b]=prange(date,'week'),g=pgoalParts(goals,date);return [[a,pdate(a,3),g.front],[pdate(a,4),b,g.back]];}
+function pmergeParts(parts) {const out={...parts[0],end:parts[1].end,parts};for(const k of ['goal','actual','remain','deliveryRemain','forecast','credit','allocated','unallocated','excess'])out[k]=parts.reduce((n,p)=>n+(p[k]||0),0);for(const k of ['rows','free','fixed','quests'])out[k]=parts.flatMap(p=>p[k]||[]);return out;}
+
 function psetGoal(goals,date,kind,amount) {
   const key=pgoalKey(date,kind),old=goals[key];
   return {...goals,[key]:{...(old&&typeof old==='object'?old:{cnt:0}),amt:pn(amount)}};
@@ -91,9 +97,10 @@ function pdaySetting(p,goals,date) {
   const old=goals['D-'+date],amt=pn(typeof old==='object'?old?.amt:old),cnt=pn(old?.cnt);
   return amt>0?{mode:'amt',value:amt,legacy:true}:cnt>0?{mode:'cnt',value:cnt,legacy:true}:{mode:'auto',value:''};
 }
-function pweek(vault,goals,p,date,asOf) {
-  const [start,end]=prange(date,'week'),dates=pdays(start,end),goal=pgoal(goals,date,'week');
-  const actual=pactual(vault,start,end),quests=pquestMoney(vault,p,asOf).filter(x=>x.q.start<=end&&x.q.end>=start);
+function pweek(vault,goals,p,date,asOf,range=null) {
+  if(!range&&phasSplit(goals,date))return pmergeParts(ppartRanges(goals,date).map(r=>pweek(vault,goals,p,date,asOf,r)));
+  const [start,end]=range||prange(date,'week'),dates=pdays(start,end),goal=range?range[2]:pgoal(goals,date,'week');
+  const actual=pactual(vault,start,end),quests=pquestMoney(vault,p,asOf).filter(x=>range?x.q.end>=start&&x.q.end<=end:x.q.start<=end&&x.q.end>=start);
   const forecast=quests.reduce((a,x)=>a+x.pending,0),includeQuest=p.weekly?.[pgoalKey(date,'week')]?.includeQuest===true;
   const credit=includeQuest||['quest','counts'].includes(p.calc.strategy)?forecast:0,remain=Math.max(0,goal-actual),deliveryRemain=Math.max(0,remain-credit);
   const rows=dates.map(d=>{
@@ -150,8 +157,8 @@ function phorizon(vault,goals,p,date,kind,asOf) {
 
 // Quest quotas are allocated within their own deadlines. Revenue is shared by
 // the selected week; only unrecorded rewards reduce the remaining delivery need.
-function pcompanyPlan(vault,goals,p,date,asOf,baseline=true) {
-  const w=pweek(vault,goals,p,date,asOf),rows=w.rows.map(r=>({...r,u:0,d:0}));
+function pcompanyPlan(vault,goals,p,date,asOf,baseline=true,range=null) {
+  const w=pweek(vault,goals,p,date,asOf,range),rows=w.rows.map(r=>({...r,u:0,d:0}));
   const spread=(n,eligible,key)=>{if(!eligible.length)return n;const part=Math.ceil(n/eligible.length);for(const r of eligible){const take=Math.min(n,part);r[key]+=take;n-=take;}return n;};
   let unallocatedUber=0;
   for(const {q} of w.quests){
@@ -167,16 +174,17 @@ function pcompanyPlan(vault,goals,p,date,asOf,baseline=true) {
   rows.forEach(r=>{r.need=d===null||r.u>0&&pn(p.calc.u)<=0?null:r.u+r.d;r.hours=ptime(r.need,p.calc.uph);});
   let capacity=0;
   if(baseline){
-    const original=pcompanyPlan({},goals,p,date,w.start,false);
+    const original=pcompanyPlan({},goals,p,date,w.start,false,range);
     capacity=original.rows.filter(r=>r.eligible&&r.date>=asOf).reduce((n,r)=>n+Math.max(0,r.u-pday(vault,r.date).u.cnt)+Math.max(0,r.d-pday(vault,r.date).d.cnt),0);
   }
   return {w,rows,u,d,delivery,shortfall,unallocatedUber,unallocatedD,need:d===null?null:u+d,capacity,requiredAverage:capacity>0?delivery/capacity:null,reason:u>0&&pn(p.calc.u)<=0?'Uber通常単価を設定してください。':d===null?'出前館通常単価を設定してください。':''};
 }
 
-function pcountPlan(vault,goals,p,date,asOf) {
-  const minimum=pcompanyPlan(vault,goals,p,date,asOf),w=minimum.w;
+function pcountPlan(vault,goals,p,date,asOf,range=null) {
+  const minimum=pcompanyPlan(vault,goals,p,date,asOf,true,range),w=minimum.w;
   const done=k=>pdays(w.start,w.end).reduce((n,d)=>n+pday(vault,d)[k].cnt,0);
-  const u=Math.max(minimum.u,Math.max(0,pn(p.calc.uCount)-done('u'))),d=Math.max(0,pn(p.calc.dCount)-done('d'));
+  const countFor=key=>{if(range?.[3]?.[key]!==undefined)return range[3][key];if(!range)return pn(p.calc[key]);const [a,b]=prange(date,'week'),all=pdays(a,b).filter(d=>p.days[d]?.mode!=='off'),part=all.filter(d=>d>=w.start&&d<=w.end);const daily=all.length?Math.ceil(pn(p.calc[key])/all.length):0;return part.reduce((n,d)=>n+Math.max(0,Math.min(daily,pn(p.calc[key])-all.indexOf(d)*daily)),0);};
+  const u=Math.max(minimum.u,Math.max(0,countFor('uCount')-done('u'))),d=Math.max(0,countFor('dCount')-done('d'));
   const rows=minimum.rows.map(r=>({...r,d:0})),active=rows.filter(r=>r.eligible);
   const spread=(n,key)=>{const part=active.length?Math.ceil(n/active.length):0;for(const r of active){const take=Math.min(n,part);r[key]+=take;n-=take;}return n;};
   const unallocatedUber=minimum.unallocatedUber+spread(u-minimum.u,'u'),unallocatedD=spread(d,'d');
@@ -185,5 +193,17 @@ function pcountPlan(vault,goals,p,date,asOf) {
   return {...minimum,rows,u,d,need:capacity,delivery,capacity,requiredAverage:capacity?delivery/capacity:null,shortfall:Math.max(0,delivery-estimated),estimated,unallocatedUber,unallocatedD,reason:!capacity&&delivery>0?'会社別の計画件数を入力してください。':''};
 }
 function pselectedPlan(vault,goals,p,date,asOf) {
-  return p.calc.strategy==='counts'?pcountPlan(vault,goals,p,date,asOf):p.calc.strategy==='quest'?pcompanyPlan(vault,goals,p,date,asOf):null;
+  if(!['counts','quest'].includes(p.calc.strategy))return null;
+  const run=r=>p.calc.strategy==='counts'?pcountPlan(vault,goals,p,date,asOf,r):pcompanyPlan(vault,goals,p,date,asOf,true,r);
+  if(!phasSplit(goals,date))return run(null);
+  let ranges=ppartRanges(goals,date);
+  if(p.calc.strategy==='counts'){
+    const mins=ranges.map(r=>pcompanyPlan(vault,goals,p,date,asOf,true,r)),done=r=>pdays(r[0],r[1]).reduce((n,d)=>n+pday(vault,d).u.cnt,0);
+    let extra=Math.max(0,pn(p.calc.uCount)-ranges.reduce((n,r)=>n+done(r),0)-mins.reduce((n,m)=>n+m.u,0));
+    const slots=mins.flatMap(m=>m.rows.filter(r=>r.eligible)),each=slots.length?Math.ceil(extra/slots.length):0;
+    ranges=ranges.map((r,i)=>{const add=slots.length?Math.min(extra,each*mins[i].rows.filter(x=>x.eligible).length):(i===1?extra:0);extra-=add;return [...r,{uCount:done(r)+mins[i].u+add}];});
+  }
+  const parts=ranges.map(run),out={...parts[0],parts,w:pmergeParts(parts.map(x=>x.w)),rows:parts.flatMap(x=>x.rows)};
+  for(const k of ['u','d','need','delivery','shortfall','capacity','unallocatedUber','unallocatedD'])out[k]=parts.some(x=>x[k]===null)?null:parts.reduce((n,x)=>n+x[k],0);
+  out.requiredAverage=out.capacity>0?out.delivery/out.capacity:null;out.reason=parts.map(x=>x.reason).filter(Boolean).join(' ');return out;
 }
