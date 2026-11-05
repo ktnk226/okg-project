@@ -51,6 +51,7 @@ function pvalidate(p) {
   for(let i=1;i<ordered.length;i++)if(ordered[i].start<=ordered[i-1].end)throw Error('日跨ぎクエストの期間が重複しています');
   if(p.weekly!==undefined&&(!obj(p.weekly)||Object.values(p.weekly).some(v=>!obj(v)||typeof v.includeQuest!=='boolean')))throw Error('週の設定が不正です');
   if(p.horizons!==undefined&&(!obj(p.horizons)||Object.entries(p.horizons).some(([k,v])=>!/^([MY])-\d{4}(-\d{2})?$/.test(k)||!obj(v)||!number(v.daily)||!number(v.workDays)||!Number.isInteger(Number(v.workDays)))))throw Error('月・年の想定が不正です');
+  if(typeof dailyValidate==='function')dailyValidate(p);
   return p;
 }
 function pload() {try {const raw=localStorage.getItem(PLAN_KEY);return {data:raw?pvalidate(JSON.parse(raw)):pdefault(),error:''};}catch{return {data:pdefault(),error:'計画データを読み込めません。既存データを保護して保存を停止しています。バックアップから復元してください。'};}}
@@ -97,10 +98,10 @@ function pdaySetting(p,goals,date) {
   const old=goals['D-'+date],amt=pn(typeof old==='object'?old?.amt:old),cnt=pn(old?.cnt);
   return amt>0?{mode:'amt',value:amt,legacy:true}:cnt>0?{mode:'cnt',value:cnt,legacy:true}:{mode:'auto',value:''};
 }
-function pweek(vault,goals,p,date,asOf,range=null) {
-  if(!range&&phasSplit(goals,date))return pmergeParts(ppartRanges(goals,date).map(r=>pweek(vault,goals,p,date,asOf,r)));
+function pweek(vault,goals,p,date,asOf,range=null,rewardDate=asOf) {
+  if(!range&&phasSplit(goals,date))return pmergeParts(ppartRanges(goals,date).map(r=>pweek(vault,goals,p,date,asOf,r,rewardDate)));
   const [start,end]=range||prange(date,'week'),dates=pdays(start,end),goal=range?range[2]:pgoal(goals,date,'week');
-  const actual=pactual(vault,start,end),quests=pquestMoney(vault,p,asOf).filter(x=>range?x.q.end>=start&&x.q.end<=end:x.q.start<=end&&x.q.end>=start);
+  const actual=pactual(vault,start,end),quests=pquestMoney(vault,p,rewardDate).filter(x=>range?x.q.end>=start&&x.q.end<=end:x.q.start<=end&&x.q.end>=start);
   const forecast=quests.reduce((a,x)=>a+x.pending,0),includeQuest=p.weekly?.[pgoalKey(date,'week')]?.includeQuest===true;
   const credit=includeQuest||['quest','counts'].includes(p.calc.strategy)?forecast:0,remain=Math.max(0,goal-actual),deliveryRemain=Math.max(0,remain-credit);
   const rows=dates.map(d=>{

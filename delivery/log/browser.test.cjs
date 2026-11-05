@@ -1,86 +1,57 @@
-// Run against an isolated local server; all storage belongs to fresh test contexts.
-const {chromium,devices}=require('playwright');
-const assert=require('node:assert/strict');
-const fs=require('node:fs');
-const path=require('node:path');
-const url=process.env.DELILOG_TEST_URL||'http://127.0.0.1:8000/delivery/log/';
-const output=process.env.DELILOG_TEST_OUTPUT||'/tmp/delilog-validation';
-const date='2026-11-06';
+// npm install playwright; run a local server first. Tests use fresh isolated storage.
+const {chromium,devices}=require('playwright'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
+const url=process.env.DELILOG_TEST_URL||'http://127.0.0.1:8011/delivery/log/';
+const output=process.env.DELILOG_TEST_OUTPUT||'/tmp/delilog-daily-validation';fs.mkdirSync(output,{recursive:true});
+const date='2026-11-06',sat='2026-11-07',sun='2026-11-08';
 const keys={db:'delivery_log_vault_v13',goals:'delivery_log_periodic_goals_v13',planning:'delivery_log_planning_v15',memos:'delivery_log_inbox_memos_v13',expenses:'delivery_log_expenses_v1'};
-fs.mkdirSync(output,{recursive:true});
 async function run(browser,mobile){
- const context=await browser.newContext({...mobile?devices['iPhone 13']:{viewport:{width:1440,height:1000}},timezoneId:'Asia/Tokyo',locale:'ja-JP',acceptDownloads:true});
- const page=await context.newPage(),errors=[];
- const setGoal=async value=>{const control=page.getByTestId('simulation-goal');if(await control.evaluate(e=>e.tagName==='INPUT'))await control.fill(value);else{await page.getByTestId('front-goal').fill('0');await page.getByTestId('back-goal').fill(value);}};page.setDefaultTimeout(12000);page.on('pageerror',e=>errors.push(e.message));page.on('dialog',d=>d.accept());
+ const context=await browser.newContext({...mobile?devices['iPhone 13']:{viewport:{width:1440,height:1000}},locale:'ja-JP',timezoneId:'Asia/Tokyo',acceptDownloads:true});
+ const page=await context.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));page.on('dialog',d=>d.accept());page.setDefaultTimeout(15000);
  await page.clock.install({time:new Date('2026-11-06T03:00:00Z')});
  if(process.env.DELILOG_TEST_ASSETS){await page.route('https://cdnjs.cloudflare.com/**',r=>r.fulfill({path:path.join(process.env.DELILOG_TEST_ASSETS,r.request().url().includes('/react-dom/')?'react-dom.js':r.request().url().includes('/react/')?'react.js':'babel.js'),contentType:'text/javascript'}));await page.route('https://fonts.googleapis.com/**',r=>r.fulfill({body:'',contentType:'text/css'}));}
+ const storage=()=>page.evaluate(keys=>Object.fromEntries(Object.entries(keys).map(([k,v])=>[k,JSON.parse(localStorage.getItem(v))])),keys);
+ const open=()=>page.locator('.sim-open').click();
+ const row=d=>page.getByTestId('allocation-'+d);
+ const field=(d,key,label)=>page.getByLabel(`${d} ${key} ${label}`,{exact:true});
+ const screenshot=async name=>{await page.screenshot({path:path.join(output,(mobile?'iphone-':'pc-')+name+'.png')});};
  await page.goto(url);await page.getByTestId('home-target').waitFor();
  await page.evaluate(({keys,date})=>{
-  const entry=n=>({weather:'晴',dailyMemo:'既存の記録',condition:4,sleepHours:7,sets:[{u_cum:n,u_cnt_cum:n/500,open:true}]});
-  const planning=pdefault();delete planning.weekly;delete planning.horizons;planning.calc={u:500,d:600,uph:4,company:'u',share:100};planning.models[1].uph='3.5';
-  localStorage.setItem(keys.db,JSON.stringify({'2026-01-01':entry(2000),'2026-10-31':entry(1000),'2026-11-01':entry(100000)}));
-  localStorage.setItem(keys.goals,JSON.stringify({'W-2026-W45':{amt:30000,cnt:100},'M-2026-11':{amt:500000,cnt:1000},'Y-2026':{amt:6000000},'D-2026-10-31':{amt:12000,cnt:20}}));
-  localStorage.setItem(keys.planning,JSON.stringify(planning));
-  localStorage.setItem(keys.memos,JSON.stringify([{id:1,date:'2026-10-31',text:'既存メモ',category:'🛵稼働'}]));
-  localStorage.setItem(keys.expenses,JSON.stringify([{id:'expense1',date:'2026-10-31',amount:1200,category:'燃料費',payee:'テスト',memo:'既存経費'}]));
-  localStorage.setItem('delivery_log_current_date_v13',date);
+  const p=pdefault();p.calc={u:350,d:500,uph:3.2,company:'u',share:100,strategy:'counts',uCount:120,dCount:10};p.models[1]={name:'通常期',u:350,d:500,uph:3.5};p.quests=[{id:date,start:date,end:'2026-11-08',count:120,base:13000,extra:0,adjust:0,aim:'base',finish:'n',status:'n',links:[]}];
+  localStorage.setItem(keys.planning,JSON.stringify(p));localStorage.setItem(keys.goals,JSON.stringify({'W-2026-W45':{amt:90000,front:30000,back:60000,cnt:100},'M-2026-11':{amt:500000},'Y-2026':{amt:6000000}}));
+  localStorage.setItem(keys.db,JSON.stringify({'2026-11-01':{dailyMemo:'既存記録',sets:[{u_cum:100000,u_cnt_cum:200}]}}));localStorage.setItem(keys.memos,JSON.stringify([{id:1,date:'2026-11-01',text:'既存メモ',category:'🛵稼働'}]));localStorage.setItem(keys.expenses,JSON.stringify([{id:'e1',date:'2026-11-01',amount:1200,category:'燃料費',payee:'test',memo:'既存経費'}]));localStorage.setItem('delivery_log_current_date_v13',date);
  },{keys,date});
- await page.reload();await page.getByTestId('home-target').waitFor();
- assert.equal(await page.getByTestId('home-target').innerText(),'10,000円');
- const initialStorage=await page.evaluate(keys=>Object.fromEntries(Object.entries(keys).map(([k,v])=>[k,JSON.parse(localStorage.getItem(v))])),keys);
- assert.equal(initialStorage.planning.horizons,undefined,'legacy planning is not rewritten on load');
- await page.locator('.sim-open').click();assert.equal(await page.getByRole('tab').count(),3);assert.equal(await page.getByRole('tab',{name:'週 日別の配分'}).getAttribute('aria-selected'),'true');
- assert.equal(await page.getByText('目標管理',{exact:true}).count(),0);assert.equal(await page.getByText('逆算',{exact:true}).count(),0);
- await page.getByLabel(date+'の稼働予定',{exact:true}).selectOption('amt');await page.getByLabel(date+'の指定値',{exact:true}).fill('8000');
- assert.match(await page.getByTestId('allocation-2026-11-07').innerText(),/11,000円/);assert.match(await page.getByTestId('allocation-2026-11-08').innerText(),/11,000円/);
- await page.getByLabel('2026-11-07の稼働予定',{exact:true}).selectOption('off');assert.equal(await page.getByTestId('allocation-2026-11-07').getByTestId('day-target').innerText(),'休み');assert.match(await page.getByTestId('allocation-2026-11-08').innerText(),/22,000円/);
- await page.getByLabel('2026-11-07の稼働予定',{exact:true}).selectOption('auto');
- await page.getByTestId('allocation-'+date).getByRole('button',{name:'ホームで実績を入力 →',exact:true}).click();
- const uber=page.locator('.platform-block').filter({has:page.locator('.platform-title>span').getByText('Uber Eats',{exact:true})}).first();
- await uber.locator('input').nth(0).fill('2000');await uber.locator('input').nth(1).fill('4');
- assert.equal(await page.getByTestId('home-target').innerText(),'8,000円');assert.match(await page.getByTestId('home-remaining').innerText(),/6,000/);assert.equal(await page.getByTestId('home-count').innerText(),'12件');assert.equal(await page.getByTestId('home-time').innerText(),'3時間0分');
- assert.equal(await page.locator('.period-tabs .period-tab').count(),4);assert.equal(await page.getByLabel(date+'の指定値',{exact:true}).count(),0);
- await page.locator('.main-content').evaluate(e=>e.scrollTop=0);await page.evaluate(()=>window.scrollTo(0,0));await page.screenshot({path:path.join(output,(mobile?'iphone':'pc')+'-home.png')});
- await page.locator('.sim-open').click();const weekSettings=await page.evaluate(keys=>({days:JSON.parse(localStorage.getItem(keys.planning)).days,week:JSON.parse(localStorage.getItem(keys.goals))['W-2026-W45']}),keys);
- await page.getByRole('tab',{name:'月 月の見通し'}).click();assert.equal(await page.getByTestId('simulation-actual').innerText(),'102,000円');await setGoal('450000');await page.getByLabel('残りの想定稼働日数（空欄は残り全日）',{exact:true}).fill('20');await page.getByLabel('今後1稼働日あたりの追加売上（円）',{exact:true}).fill('20000');assert.equal(await page.getByTestId('horizon-required').innerText(),'17,400円');assert.equal(await page.getByTestId('horizon-projection').innerText(),'502,000円');
- await page.locator('.main-content').evaluate(e=>e.scrollTop=0);await page.evaluate(()=>window.scrollTo(0,0));await page.screenshot({path:path.join(output,(mobile?'iphone':'pc')+'-month.png')});
- await page.getByRole('tab',{name:'年 年の見通し'}).click();assert.equal(await page.getByTestId('simulation-actual').innerText(),'105,000円');await setGoal('5500000');await page.getByLabel('残りの想定稼働日数（空欄は残り全日）',{exact:true}).fill('40');await page.getByLabel('今後1稼働日あたりの追加売上（円）',{exact:true}).fill('25000');
- assert.deepEqual(await page.evaluate(keys=>({days:JSON.parse(localStorage.getItem(keys.planning)).days,week:JSON.parse(localStorage.getItem(keys.goals))['W-2026-W45']}),keys),weekSettings);
- await page.getByRole('tab',{name:'週 日別の配分'}).click();assert.match(await page.getByTestId('allocation-2026-11-07').innerText(),/11,000円/);
- await page.getByRole('button',{name:'後半（金〜日）のクエストを追加',exact:true}).click();const q=page.locator('.sim-quest');await q.getByLabel('基本の対象回数',{exact:true}).selectOption('10');await q.getByLabel('基本達成報酬（円）',{exact:true}).fill('2000');
- assert.match(await q.innerText(),/対象実績 4件/);await page.getByLabel('クエスト見込みを週の必要売上から差し引く',{exact:true}).check();assert.match(await page.getByTestId('allocation-2026-11-07').innerText(),/10,000円/);
- await page.getByRole('button',{name:'ホームへ →',exact:true}).click();const d=page.locator('.platform-block').filter({has:page.locator('.platform-title>span').getByText('出前館',{exact:true})}).first();await d.locator('input').nth(1).fill('50');await uber.locator('input').nth(2).fill('2000');
- await page.locator('.sim-open').click();assert.match(await q.innerText(),/対象実績 4件/);assert.match(await q.innerText(),/未入力の報酬見込み\s*0円/);assert.equal(await page.getByTestId('simulation-actual').innerText(),'4,000円');
- const overflows=await page.locator('.simulation').evaluate(e=>Array.from(e.querySelectorAll('input,select,button')).filter(x=>x.getBoundingClientRect().width>0&&(x.getBoundingClientRect().right>innerWidth+1||x.getBoundingClientRect().left<0)).map(x=>x.outerHTML.slice(0,160)));assert.deepEqual(overflows,[],'controls fit viewport');
- assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
- if(mobile){const nav=page.locator('.bottom-nav');assert.equal(await nav.getByRole('button').count(),6);assert.equal(await nav.getByRole('button',{name:mobile?'売上シミュレーション':'🧮 売上シミュレーション'}).getAttribute('aria-current'),'page');}
- await page.locator('.main-content').evaluate(e=>e.scrollTop=0);await page.evaluate(()=>window.scrollTo(0,0));await page.screenshot({path:path.join(output,(mobile?'iphone':'pc')+'-week.png')});
- await page.getByTestId('allocation-'+date).scrollIntoViewIfNeeded();await page.screenshot({path:path.join(output,(mobile?'iphone':'pc')+'-allocation.png')});
- await page.getByLabel('1時間あたりの配達件数（UPH）',{exact:true}).fill('3.2');
- const saved=await page.evaluate(keys=>Object.fromEntries(Object.entries(keys).map(([k,v])=>[k,JSON.parse(localStorage.getItem(v))])),keys);await page.reload();await page.getByTestId('home-target').waitFor();
- assert.deepEqual(await page.evaluate(keys=>Object.fromEntries(Object.entries(keys).map(([k,v])=>[k,JSON.parse(localStorage.getItem(v))])),keys),saved);
- assert.deepEqual(saved.memos,initialStorage.memos);assert.deepEqual(saved.expenses,initialStorage.expenses);assert.deepEqual(saved.db['2026-11-01'],initialStorage.db['2026-11-01']);assert.deepEqual(saved.goals['D-2026-10-31'],initialStorage.goals['D-2026-10-31']);assert.equal(saved.goals['W-2026-W45'].cnt,100);
- const settings=page.locator(mobile?'.bottom-nav':'.nav-menu').getByRole('button',{name:mobile?'設定':'⚙️ 設定・同期',exact:true});await settings.click();
- const download=page.waitForEvent('download');await page.getByRole('button',{name:'💾 iCloudへ完全保存',exact:true}).click();const file=await download;const backup=JSON.parse(fs.readFileSync(await file.path(),'utf8'));assert.equal(Number(backup.planning.calc.uph),3.2);assert.equal(Number(backup.planning.models[1].uph),3.5);assert.equal(backup.version,16);assert.deepEqual(backup.planning,saved.planning);assert.deepEqual(backup.vault,saved.db);
- // Restore through the real file picker after changing the goal.
- await page.locator(mobile?'.bottom-nav':'.nav-menu').getByRole('button',{name:mobile?'売上シミュレーション':'🧮 売上シミュレーション',exact:true}).click();await setGoal('99999');await settings.click();
- await page.locator('#settingsCloudLoad').setInputFiles({name:'restore.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(backup))});await page.waitForFunction(([key,expected])=>JSON.parse(localStorage.getItem(key))['W-2026-W45'].amt===expected,[keys.goals,30000]);
- const restored=await page.evaluate(keys=>Object.fromEntries(Object.entries(keys).map(([k,v])=>[k,JSON.parse(localStorage.getItem(v))])),keys);assert.deepEqual(restored,saved);
- const oldBackup={vault:backup.vault,periodicGoals:backup.periodicGoals,memos:backup.memos,version:13};
- await page.locator('#settingsCloudLoad').setInputFiles({name:'old-v13.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(oldBackup))});
- await page.waitForTimeout(50);assert.deepEqual(await page.evaluate(k=>JSON.parse(localStorage.getItem(k)),keys.planning),saved.planning);assert.deepEqual(await page.evaluate(k=>JSON.parse(localStorage.getItem(k)),keys.expenses),saved.expenses);
- await page.evaluate(k=>localStorage.setItem(k,'{\"invalid\":true}'),keys.planning);await page.reload();await page.getByRole('alert').getByText(/計画データを読み込めません/).waitFor();
- assert.equal(await page.evaluate(k=>localStorage.getItem(k),keys.planning),'{\"invalid\":true}');await settings.click();
- await page.locator('#settingsCloudLoad').setInputFiles({name:'recover-v16.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(backup))});
- await page.waitForFunction(([key,expected])=>JSON.parse(localStorage.getItem(key)).calc?.u===expected,[keys.planning,500]);assert.deepEqual(await page.evaluate(k=>JSON.parse(localStorage.getItem(k)),keys.planning),saved.planning);assert.deepEqual(errors,[]);
- await page.locator(mobile?'.bottom-nav':'.nav-menu').getByRole('button',{name:mobile?'売上シミュレーション':'🧮 売上シミュレーション',exact:true}).click();
- await page.getByLabel('1時間あたりの配達件数（UPH）',{exact:true}).fill('3.5');await page.getByLabel('計画方式',{exact:true}).selectOption('quest');
- await page.evaluate(({keys,date})=>{const p=pdefault();p.calc={u:320,d:400,uph:3.5,company:'u',share:100,strategy:'quest'};p.quests=[{id:date,start:date,end:'2026-11-08',count:100,base:12000,extra:0,adjust:0,aim:'base',finish:'n',status:'n',links:[]}];localStorage.setItem(keys.planning,JSON.stringify(p));localStorage.setItem(keys.db,'{}');localStorage.setItem(keys.goals,JSON.stringify(psetGoal({},date,'week',50000)));},{keys,date});
- await page.reload();await page.locator('.sim-open').click();assert.match(await page.getByTestId('company-plan').innerText(),/100件.*15件/s);assert.match(await page.getByTestId('allocation-'+date).innerText(),/Uber Eats 34件.*出前館 5件/s);assert.equal(await page.getByLabel('1時間あたりの配達件数（UPH）',{exact:true}).inputValue(),'3.5');assert.deepEqual(errors,[]);
- await page.getByLabel('計画方式',{exact:true}).selectOption('counts');await page.getByLabel('Uber Eatsの計画件数（週合計）',{exact:true}).fill('100');await page.getByLabel('出前館の計画件数（週合計）',{exact:true}).fill('15');assert.match(await page.getByTestId('company-plan').innerText(),/100件.*15件/s);assert.equal(await page.getByLabel('Uber Eatsの件数比率（%）').count(),0);await page.reload();await page.locator('.sim-open').click();assert.equal(await page.getByLabel('出前館の計画件数（週合計）',{exact:true}).inputValue(),'15');assert.deepEqual(errors,[]);
- await page.getByTestId('front-goal').fill('30000');await page.getByTestId('back-goal').fill('50000');assert.equal(await page.getByTestId('simulation-goal').innerText(),'80,000円');assert.equal(await page.getByTestId('simulation-goal').evaluate(e=>e.tagName==='INPUT'),false);await page.reload();await page.locator('.sim-open').click();assert.equal(await page.getByTestId('simulation-goal').innerText(),'80,000円');assert.equal(await page.getByTestId('front-goal').inputValue(),'30000');assert.equal(await page.getByTestId('back-goal').inputValue(),'50000');assert.deepEqual(errors,[]);
- await settings.click();const splitDownload=page.waitForEvent('download');await page.getByRole('button',{name:'💾 iCloudへ完全保存',exact:true}).click();const splitBackup=JSON.parse(fs.readFileSync(await (await splitDownload).path(),'utf8'));assert.equal(splitBackup.periodicGoals['W-2026-W45'].front,30000);assert.equal(splitBackup.periodicGoals['W-2026-W45'].back,50000);await page.locator('#settingsCloudLoad').setInputFiles({name:'split.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(splitBackup))});await page.waitForTimeout(50);assert.deepEqual(errors,[]);
- console.log(`PASS ${mobile?'iPhone 13 emulation':'PC'}: migration, allocation, actuals/home sync, independent horizons, quest accounting, viewport, reload, JSON backup/restore`);
+ await page.reload();await page.getByTestId('home-target').waitFor();const original=await storage();
+ await open();assert.equal(await page.getByLabel('計画方式',{exact:true}).count(),0);assert.equal(await page.getByLabel('Uber Eatsの計画件数（週合計）',{exact:true}).count(),0);
+ for(const d of [date,sat,sun])assert.match(await page.getByTestId(d+'-u-counts').innerText(),/計画 40件/);
+ await field(date,'Uber','計画件数（空欄で自動）').fill('45');await field(sat,'Uber','計画件数（空欄で自動）').fill('45');assert.match(await page.getByTestId(sun+'-u-counts').innerText(),/計画 30件/);
+ await field(date,'Uber','通常単価（円）').fill('400');await field(date,'Uber','UPH（件/時）').fill('3.5');await field(sat,'Uber','通常単価（円）').fill('300');await field(sat,'Uber','UPH（件/時）').fill('3.2');
+ await row(sun).getByRole('button',{name:'この日だけにプリセットを適用',exact:true}).click();assert.equal(await field(date,'Uber','通常単価（円）').inputValue(),'400');assert.equal(await field(sat,'Uber','通常単価（円）').inputValue(),'300');assert.equal(await field(sun,'Uber','UPH（件/時）').inputValue(),'3.5');
+ const period=page.getByTestId('daily-period-'+date);assert.match(await period.innerText(),/出前館 10件/);
+ for(const d of [date,sat,sun])await field(d,'出前館','通常単価（円）').fill('400');assert.match(await period.innerText(),/出前館 13件/);
+ await page.getByRole('group',{name:date+' 不足を補う会社',exact:true}).getByRole('button',{name:/Uber Eats/}).click();assert.match(await period.innerText(),/出前館 0件/);await page.getByRole('group',{name:date+' 不足を補う会社',exact:true}).getByRole('button',{name:/出前館/}).click();
+ await page.getByLabel(sat+'の稼働予定',{exact:true}).selectOption('off');assert.match(await page.getByTestId(sun+'-u-counts').innerText(),/計画 75件/);await page.getByLabel(sat+'の稼働予定',{exact:true}).selectOption('auto');assert.equal(await field(sat,'Uber','計画件数（空欄で自動）').inputValue(),'45');assert.match(await page.getByTestId(sun+'-u-counts').innerText(),/計画 30件/);
+ await row(date).scrollIntoViewIfNeeded();await screenshot('daily-plan');const beforeActual=await row(date).getByTestId('day-target').innerText();
+ await row(date).getByRole('button',{name:'ホームで実績を入力 →',exact:true}).click();
+ const uber=page.locator('.platform-block').filter({has:page.locator('.platform-title>span').getByText('Uber Eats',{exact:true})}).first();const demae=page.locator('.platform-block').filter({has:page.locator('.platform-title>span').getByText('出前館',{exact:true})}).first();
+ await uber.locator('input').nth(0).fill('2000');await uber.locator('input').nth(1).fill('5');await demae.locator('input').nth(1).fill('50');assert.equal(await page.getByTestId('home-target').innerText(),beforeActual);
+ await open();assert.match(await page.getByTestId('quest-remaining-'+date).innerText(),/115件/);assert.match(await page.getByTestId(sun+'-u-counts').innerText(),/計画 30件/);await page.getByRole('button',{name:'ホームへ →',exact:true}).click();
+ await page.getByRole('button',{name:'シミュレーションに反映',exact:true}).click();await open();assert.match(await page.getByTestId(sun+'-u-counts').innerText(),/計画 70件/);await page.getByRole('button',{name:'ホームへ →',exact:true}).click();
+ await uber.locator('input').nth(0).fill('5000');await uber.locator('input').nth(1).fill('10');await open();assert.match(await page.getByTestId(sun+'-u-counts').innerText(),/計画 70件/);await page.getByRole('button',{name:'ホームへ →',exact:true}).click();await page.getByRole('button',{name:'シミュレーションに反映',exact:true}).click();await page.getByRole('button',{name:'シミュレーションに反映',exact:true}).click();await open();assert.match(await page.getByTestId(sun+'-u-counts').innerText(),/計画 65件/);
+ const configured=await storage();assert.deepEqual(configured.db['2026-11-01'],original.db['2026-11-01']);assert.deepEqual(configured.memos,original.memos);assert.deepEqual(configured.expenses,original.expenses);assert.equal(configured.goals['W-2026-W45'].cnt,100);
+ // Separate cash example uses empty planning data in this fresh test context.
+ await page.evaluate(({keys,date})=>{const p=pdefault();p.calc={u:500,d:500,uph:3.2,company:'u',share:100};localStorage.setItem(keys.planning,JSON.stringify(p));const g=JSON.parse(localStorage.getItem(keys.goals));localStorage.setItem(keys.goals,JSON.stringify(psetPart(psetPart(g,date,'front',0),date,'back',30000)));const v=JSON.parse(localStorage.getItem(keys.db));delete v[date];localStorage.setItem(keys.db,JSON.stringify(v));},{keys,date});
+ await page.reload();await page.getByTestId('home-target').waitFor();assert.equal(await page.getByTestId('home-target').innerText(),'10,000円');
+ for(const [amount,next] of [['12000','9,000円'],['15000','7,500円'],['8000','11,000円']]){
+  await uber.locator('input').nth(0).fill(amount);assert.equal(await page.getByTestId('home-target').innerText(),'10,000円');await page.getByRole('button',{name:'シミュレーションに反映',exact:true}).click();await open();assert.equal(await row(sat).getByTestId('day-target').innerText(),next);assert.equal(await row(sun).getByTestId('day-target').innerText(),next);await page.getByRole('button',{name:'ホームへ →',exact:true}).click();
+ }
+ assert.match(await page.getByTestId('home-remaining').innerText(),/2,000/);assert.equal(await page.locator('.period-tabs .period-tab').count(),4);await page.locator('.planner-home').scrollIntoViewIfNeeded();await screenshot('home');
+ const saved=await storage();await page.reload();await page.getByTestId('home-target').waitFor();assert.deepEqual(await storage(),saved);
+ await open();const overflow=await page.locator('.daily-editor').evaluate(e=>Array.from(e.querySelectorAll('input,select,button')).filter(x=>x.getBoundingClientRect().width>0&&(x.getBoundingClientRect().right>innerWidth+1||x.getBoundingClientRect().left<0)).map(x=>x.outerHTML.slice(0,100)));assert.deepEqual(overflow,[]);assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
+ const settings=()=>page.locator(mobile?'.bottom-nav':'.nav-menu').getByRole('button',{name:mobile?'設定':'⚙️ 設定・同期',exact:true}).click();await settings();
+ const download=page.waitForEvent('download');await page.getByRole('button',{name:'💾 iCloudへ完全保存',exact:true}).click();const backup=JSON.parse(fs.readFileSync(await (await download).path(),'utf8'));assert.equal(backup.version,16);assert.deepEqual(backup.planning,saved.planning);assert.deepEqual(backup.vault,saved.db);
+ // Recover an invalid new field from a complete backup; raw data must survive reload.
+ await page.evaluate(k=>localStorage.setItem(k,'{"invalid":true}'),keys.planning);await page.reload();await page.getByRole('alert').getByText(/計画データを読み込めません/).waitFor();await settings();await page.locator('#settingsCloudLoad').setInputFiles({name:'restore.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(backup))});await page.waitForFunction(k=>JSON.parse(localStorage.getItem(k)).calc?.uph===3.2,keys.planning);assert.deepEqual(await storage(),saved);assert.deepEqual(errors,[]);
+ console.log(`PASS ${mobile?'iPhone 13 emulation':'PC'}: daily quotas, 45/45/30, isolated fares/UPH/preset, fill company, live vs applied actuals, repeated snapshots, cash examples, legacy data, reload and JSON recovery`);
  await context.close();
 }
 (async()=>{const browser=await chromium.launch({executablePath:process.env.CHROMIUM_PATH||'/usr/bin/chromium',headless:true,args:['--no-sandbox']});try{await run(browser,false);await run(browser,true);}finally{await browser.close();}})().catch(e=>{console.error(e);process.exitCode=1;});
