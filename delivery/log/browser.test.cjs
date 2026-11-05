@@ -16,7 +16,7 @@ async function run(browser,mobile){
  await page.goto(url);await page.getByTestId('home-target').waitFor();
  await page.evaluate(({keys,date})=>{
   const entry=n=>({weather:'晴',dailyMemo:'既存の記録',condition:4,sleepHours:7,sets:[{u_cum:n,u_cnt_cum:n/500,open:true}]});
-  const planning=pdefault();delete planning.weekly;delete planning.horizons;planning.calc={u:500,d:600,uph:4,company:'u',share:100};
+  const planning=pdefault();delete planning.weekly;delete planning.horizons;planning.calc={u:500,d:600,uph:4,company:'u',share:100};planning.models[1].uph='3.5';
   localStorage.setItem(keys.db,JSON.stringify({'2026-01-01':entry(2000),'2026-10-31':entry(1000),'2026-11-01':entry(100000)}));
   localStorage.setItem(keys.goals,JSON.stringify({'W-2026-W45':{amt:30000,cnt:100},'M-2026-11':{amt:500000,cnt:1000},'Y-2026':{amt:6000000},'D-2026-10-31':{amt:12000,cnt:20}}));
   localStorage.setItem(keys.planning,JSON.stringify(planning));
@@ -55,11 +55,12 @@ async function run(browser,mobile){
  if(mobile){const nav=page.locator('.bottom-nav');assert.equal(await nav.getByRole('button').count(),6);assert.equal(await nav.getByRole('button',{name:mobile?'売上シミュレーション':'🧮 売上シミュレーション'}).getAttribute('aria-current'),'page');}
  await page.locator('.main-content').evaluate(e=>e.scrollTop=0);await page.evaluate(()=>window.scrollTo(0,0));await page.screenshot({path:path.join(output,(mobile?'iphone':'pc')+'-week.png')});
  await page.getByTestId('allocation-'+date).scrollIntoViewIfNeeded();await page.screenshot({path:path.join(output,(mobile?'iphone':'pc')+'-allocation.png')});
+ await page.getByLabel('1時間あたりの配達件数（UPH）',{exact:true}).fill('3.2');
  const saved=await page.evaluate(keys=>Object.fromEntries(Object.entries(keys).map(([k,v])=>[k,JSON.parse(localStorage.getItem(v))])),keys);await page.reload();await page.getByTestId('home-target').waitFor();
  assert.deepEqual(await page.evaluate(keys=>Object.fromEntries(Object.entries(keys).map(([k,v])=>[k,JSON.parse(localStorage.getItem(v))])),keys),saved);
  assert.deepEqual(saved.memos,initialStorage.memos);assert.deepEqual(saved.expenses,initialStorage.expenses);assert.deepEqual(saved.db['2026-11-01'],initialStorage.db['2026-11-01']);assert.deepEqual(saved.goals['D-2026-10-31'],initialStorage.goals['D-2026-10-31']);assert.equal(saved.goals['W-2026-W45'].cnt,100);
  const settings=page.locator(mobile?'.bottom-nav':'.nav-menu').getByRole('button',{name:mobile?'設定':'⚙️ 設定・同期',exact:true});await settings.click();
- const download=page.waitForEvent('download');await page.getByRole('button',{name:'💾 iCloudへ完全保存',exact:true}).click();const file=await download;const backup=JSON.parse(fs.readFileSync(await file.path(),'utf8'));assert.equal(backup.version,16);assert.deepEqual(backup.planning,saved.planning);assert.deepEqual(backup.vault,saved.db);
+ const download=page.waitForEvent('download');await page.getByRole('button',{name:'💾 iCloudへ完全保存',exact:true}).click();const file=await download;const backup=JSON.parse(fs.readFileSync(await file.path(),'utf8'));assert.equal(Number(backup.planning.calc.uph),3.2);assert.equal(Number(backup.planning.models[1].uph),3.5);assert.equal(backup.version,16);assert.deepEqual(backup.planning,saved.planning);assert.deepEqual(backup.vault,saved.db);
  // Restore through the real file picker after changing the goal.
  await page.locator(mobile?'.bottom-nav':'.nav-menu').getByRole('button',{name:mobile?'売上シミュレーション':'🧮 売上シミュレーション',exact:true}).click();await page.getByTestId('simulation-goal').fill('99999');await settings.click();
  await page.locator('#settingsCloudLoad').setInputFiles({name:'restore.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(backup))});await page.waitForFunction(([key,expected])=>JSON.parse(localStorage.getItem(key))['W-2026-W45'].amt===expected,[keys.goals,30000]);
@@ -71,6 +72,10 @@ async function run(browser,mobile){
  assert.equal(await page.evaluate(k=>localStorage.getItem(k),keys.planning),'{\"invalid\":true}');await settings.click();
  await page.locator('#settingsCloudLoad').setInputFiles({name:'recover-v16.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(backup))});
  await page.waitForFunction(([key,expected])=>JSON.parse(localStorage.getItem(key)).calc?.u===expected,[keys.planning,500]);assert.deepEqual(await page.evaluate(k=>JSON.parse(localStorage.getItem(k)),keys.planning),saved.planning);assert.deepEqual(errors,[]);
+ await page.locator(mobile?'.bottom-nav':'.nav-menu').getByRole('button',{name:mobile?'売上シミュレーション':'🧮 売上シミュレーション',exact:true}).click();
+ await page.getByLabel('1時間あたりの配達件数（UPH）',{exact:true}).fill('3.5');await page.getByLabel('計画方式',{exact:true}).selectOption('quest');
+ await page.evaluate(({keys,date})=>{const p=pdefault();p.calc={u:320,d:400,uph:3.5,company:'u',share:100,strategy:'quest'};p.quests=[{id:date,start:date,end:'2026-11-08',count:100,base:12000,extra:0,adjust:0,aim:'base',finish:'n',status:'n',links:[]}];localStorage.setItem(keys.planning,JSON.stringify(p));localStorage.setItem(keys.db,'{}');localStorage.setItem(keys.goals,JSON.stringify(psetGoal({},date,'week',50000)));},{keys,date});
+ await page.reload();await page.locator('.sim-open').click();assert.match(await page.getByTestId('company-plan').innerText(),/100件.*15件/s);assert.match(await page.getByTestId('allocation-'+date).innerText(),/Uber Eats 34件.*出前館 5件/s);assert.equal(await page.getByLabel('1時間あたりの配達件数（UPH）',{exact:true}).inputValue(),'3.5');assert.deepEqual(errors,[]);
  console.log(`PASS ${mobile?'iPhone 13 emulation':'PC'}: migration, allocation, actuals/home sync, independent horizons, quest accounting, viewport, reload, JSON backup/restore`);
  await context.close();
 }

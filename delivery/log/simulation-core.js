@@ -32,6 +32,7 @@ function pvalidate(p) {
   if(!obj(p)||!Array.isArray(p.quests)||!obj(p.days)||!Array.isArray(p.models)||p.models.length!==3||!obj(p.calc)||!Array.isArray(p.scenarios)||p.scenarios.length!==3)throw Error('計画データの形式が違います');
   if(!['u','d','both'].includes(p.calc.company)||!['u','d','uph','share'].every(k=>number(p.calc[k]))||pn(p.calc.share)>100||!Number.isInteger(p.model)||p.model<0||p.model>2||!p.scenarios.every(v=>number(v)&&Number.isInteger(Number(v)))||Number(p.scenarios[0])!==0)throw Error('計算条件が不正です');
   if(!p.models.every(m=>obj(m)&&typeof m.name==='string'&&['u','d','uph'].every(k=>number(m[k]))))throw Error('モデルが不正です');
+  if(p.calc.strategy!==undefined&&!['ratio','quest'].includes(p.calc.strategy))throw Error('計画方式が不正です');
   const ids=new Set();
   for(const q of p.quests) {
     if(!obj(q)||typeof q.id!=='string'||ids.has(q.id)||!day(q.start)||!day(q.end)||q.end<q.start||pdays(q.start,q.end).length>4||!['n','base','extra'].includes(q.aim)||!['n','base','extra'].includes(q.finish)||!['n','base','extra','miss'].includes(q.status)||!['count','base','extra','adjust'].every(k=>number(q[k]))||pn(q.count)<10||pn(q.count)>120||pn(q.count)%10||!Array.isArray(q.links))throw Error('クエスト条件が不正です');
@@ -93,7 +94,7 @@ function pweek(vault,goals,p,date,asOf) {
   const [start,end]=prange(date,'week'),dates=pdays(start,end),goal=pgoal(goals,date,'week');
   const actual=pactual(vault,start,end),quests=pquestMoney(vault,p,asOf).filter(x=>x.q.start<=end&&x.q.end>=start);
   const forecast=quests.reduce((a,x)=>a+x.pending,0),includeQuest=p.weekly?.[pgoalKey(date,'week')]?.includeQuest===true;
-  const credit=includeQuest?forecast:0,remain=Math.max(0,goal-actual),deliveryRemain=Math.max(0,remain-credit);
+  const credit=includeQuest||p.calc.strategy==='quest'?forecast:0,remain=Math.max(0,goal-actual),deliveryRemain=Math.max(0,remain-credit);
   const rows=dates.map(d=>{
     const setting=pdaySetting(p,goals,d),actual=pday(vault,d).total,eligible=d>=asOf&&setting.mode!=='off';
     const fixed=setting.mode==='amt'?pn(setting.value):setting.mode==='cnt'?pmix(p.calc,Math.ceil(pn(setting.value))).amt:null;
@@ -133,7 +134,8 @@ function prequirements(vault,p,date,target,setting={mode:'auto'}) {
 }
 function psummary(vault,goals,p,date) {
   const w=pweek(vault,goals,p,date,date),row=w.rows.find(r=>r.date===date),target=row.target,actual=row.actual;
-  return {...prequirements(vault,p,date,target,row.setting),w,target,actual,remain:row.remaining,hasGoal:w.goal>0||row.fixed!==null,off:row.setting.mode==='off',manual:row.fixed!==null};
+  const company=p.calc.strategy==='quest'?pcompanyPlan(vault,goals,p,date,date):null,planned=company?.rows.find(r=>r.date===date);
+  return {...prequirements(vault,p,date,target,row.setting),...(company?{need:planned.need,reason:company.reason,uberNeed:planned.u}:{}),w,target,actual,remain:row.remaining,hasGoal:w.goal>0||row.fixed!==null,off:row.setting.mode==='off',manual:row.fixed!==null};
 }
 function phorizon(vault,goals,p,date,kind,asOf) {
   const [start,end]=prange(date,kind),key=pgoalKey(date,kind),goal=pgoal(goals,date,kind),actual=pactual(vault,start,end),setting=p.horizons?.[key]||{daily:'',workDays:''};
@@ -143,4 +145,29 @@ function phorizon(vault,goals,p,date,kind,asOf) {
   const daily=setting.daily===''?(recorded.length?Math.round(recorded.reduce((a,d)=>a+pday(vault,d).total,0)/recorded.length):0):pn(setting.daily);
   const remain=Math.max(0,goal-actual),projection=actual+daily*workDays;
   return {start,end,key,goal,actual,remain,remainingDays,workDays,daily,projection,gap:Math.max(0,goal-projection),required:workDays?Math.ceil(remain/workDays):null,setting};
+}
+
+// Quest quotas are allocated within their own deadlines. Revenue is shared by
+// the selected week; only unrecorded rewards reduce the remaining delivery need.
+function pcompanyPlan(vault,goals,p,date,asOf,baseline=true) {
+  const w=pweek(vault,goals,p,date,asOf),rows=w.rows.map(r=>({...r,u:0,d:0}));
+  const spread=(n,eligible,key)=>{if(!eligible.length)return n;const part=Math.ceil(n/eligible.length);for(const r of eligible){const take=Math.min(n,part);r[key]+=take;n-=take;}return n;};
+  let unallocatedUber=0;
+  for(const {q} of w.quests){
+    if(q.aim==='n'||q.status==='miss')continue;
+    const target=pn(q.count)+((q.status==='extra'||q.status==='n'&&q.aim==='extra')?10:0);
+    const remaining=Math.max(0,target-pprogress(vault,q,asOf));
+    unallocatedUber+=spread(remaining,rows.filter(r=>r.eligible&&r.date>=q.start&&r.date<=q.end),'u');
+  }
+  const u=rows.reduce((n,r)=>n+r.u,0)+unallocatedUber;
+  const delivery=Math.max(0,w.goal-w.actual-w.forecast),shortfall=Math.max(0,delivery-u*pn(p.calc.u));
+  const d=shortfall===0?0:pn(p.calc.d)>0?Math.ceil(shortfall/pn(p.calc.d)):null;
+  const unallocatedD=d===null?0:spread(d,rows.filter(r=>r.eligible),'d');
+  rows.forEach(r=>{r.need=d===null||r.u>0&&pn(p.calc.u)<=0?null:r.u+r.d;r.hours=ptime(r.need,p.calc.uph);});
+  let capacity=0;
+  if(baseline){
+    const original=pcompanyPlan({},goals,p,date,w.start,false);
+    capacity=original.rows.filter(r=>r.eligible&&r.date>=asOf).reduce((n,r)=>n+Math.max(0,r.u-pday(vault,r.date).u.cnt)+Math.max(0,r.d-pday(vault,r.date).d.cnt),0);
+  }
+  return {w,rows,u,d,delivery,shortfall,unallocatedUber,unallocatedD,need:d===null?null:u+d,capacity,requiredAverage:capacity>0?delivery/capacity:null,reason:u>0&&pn(p.calc.u)<=0?'Uber通常単価を設定してください。':d===null?'出前館通常単価を設定してください。':''};
 }

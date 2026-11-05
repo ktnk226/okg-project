@@ -97,3 +97,14 @@ test('signed accounting corrections match Home totals and do not create negative
  assert.equal(c.pday(v,date).total,1000);assert.equal(c.phorizon(v,{},p,date,'month',date).actual,1000);assert.equal(c.phorizon(v,{},p,date,'year',date).actual,1000);
  assert.equal(c.pquestMoney(v,p,date)[0].recorded,0);assert.equal(c.pquestMoney(v,p,date)[0].pending,2000);
 });
+test('quest-first example, actual revenue, deadlines, holidays and decimal UPH persistence',()=>{
+ const p=plan();p.calc={...p.calc,strategy:'quest',u:320,d:400,uph:3.2};p.models[1].uph=3.5;p.quests=[quest({count:100,base:12000})];const g=c.psetGoal({},date,'week',50000);
+ let r=c.pcompanyPlan({},g,p,date,date);assert.equal(r.u,100);assert.equal(r.d,15);assert.deepEqual(Array.from(r.rows.filter(x=>x.eligible),x=>[x.u,x.d]),[[34,5],[34,5],[32,5]]);assert.equal(c.ptime(39,3.2),'12時間12分');
+ const paid=c.pcompanyPlan({[date]:{sets:[{u_que_cum:12000}]}},g,p,date,date);assert.equal(paid.w.forecast,0);assert.equal(paid.delivery,38000);assert.equal(paid.d,15);
+ const before=JSON.stringify(p);const v={[date]:{sets:[{u_cum:15000,u_cnt_cum:34,d_cnt_cum:50}]}};
+ r=c.pcompanyPlan(v,g,p,date,'2026-11-07');assert.equal(r.u,66);assert.equal(r.d,5);assert.equal(r.rows.find(x=>x.date===date).need,0);
+ assert.ok(r.requiredAverage>0);p.days['2026-11-07']={mode:'off',value:''};r=c.pcompanyPlan(v,g,p,date,'2026-11-07');assert.equal(r.rows.find(x=>x.date==='2026-11-07').u,0);assert.equal(r.rows.find(x=>x.date==='2026-11-08').u,66);
+ r=c.pcompanyPlan({[date]:{sets:[{u_cum:50000,u_cnt_cum:4}]}},g,p,date,date);assert.equal(r.u,96);assert.equal(r.d,0);
+ const poor=c.pcompanyPlan({[date]:{sets:[{u_cum:1000,u_cnt_cum:2}]}},g,p,date,'2026-11-07');assert.ok(poor.requiredAverage>c.pcompanyPlan({},g,p,date,date).requiredAverage);
+ storage.set('delivery_log_planning_v15',before);const restored=c.pload().data;assert.equal(Number(restored.calc.uph),3.2);assert.equal(Number(restored.models[1].uph),3.5);assert.equal(c.ptime(35,restored.models[1].uph),'10時間0分');assert.equal(JSON.stringify(c.pvalidate(JSON.parse(before))),before);
+});
