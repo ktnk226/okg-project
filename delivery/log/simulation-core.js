@@ -51,6 +51,7 @@ function pvalidate(p) {
   for(let i=1;i<ordered.length;i++)if(ordered[i].start<=ordered[i-1].end)throw Error('日跨ぎクエストの期間が重複しています');
   if(p.weekly!==undefined&&(!obj(p.weekly)||Object.values(p.weekly).some(v=>!obj(v)||typeof v.includeQuest!=='boolean')))throw Error('週の設定が不正です');
   if(p.horizons!==undefined&&(!obj(p.horizons)||Object.entries(p.horizons).some(([k,v])=>!/^([MY])-\d{4}(-\d{2})?$/.test(k)||!obj(v)||!number(v.daily)||!number(v.workDays)||!Number.isInteger(Number(v.workDays)))))throw Error('月・年の想定が不正です');
+  if(typeof dailyValidate==='function')dailyValidate(p);
   return p;
 }
 function pload() {try {const raw=localStorage.getItem(PLAN_KEY);return {data:raw?pvalidate(JSON.parse(raw)):pdefault(),error:''};}catch{return {data:pdefault(),error:'計画データを読み込めません。既存データを保護して保存を停止しています。バックアップから復元してください。'};}}

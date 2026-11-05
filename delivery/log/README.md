@@ -1,5 +1,18 @@
 # デリログ：売上シミュレーション
 
+現行の日別計画・実績反映仕様の正本は[Driveの作業資料](https://docs.google.com/document/d/1UptceMRlkVnpmqqXgzuNIlddjVYu7xzDZX3DUkZE97M/edit)です。下記の旧方式の説明は変更履歴として参照してください。現行画面では計画方式・週合計件数の入力を廃止し、`daily-planning.js`で日別計画と明示的な実績反映を計算します。旧計算関数と保存フィールドは互換性検証のため保持しています。
+
+現行コードの確認コマンド：
+
+```sh
+node delivery/log/planning.test.cjs
+node delivery/log/daily-planning.test.cjs
+# ローカルHTTPサーバーの公開先を指定。Chromium/Playwrightが必要。
+DELILOG_TEST_URL=http://127.0.0.1:8020/delivery/log/ node delivery/log/browser.test.cjs
+```
+
+新しい日別条件・反映スナップショットは既存のplanningキー内に保存し、読み込み時に検証します。完全バックアップは既存v16形式を継続します。
+
 「目標管理」「逆算」を「🧮 売上シミュレーション」に統合。週・月・年の3タブで目標を設定します。ホームの日・週・月・年の集計切り替えと、日々の実績入力は継続します。
 
 ## 週とホーム
