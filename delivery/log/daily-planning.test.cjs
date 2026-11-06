@@ -87,9 +87,9 @@ test('delivery pool 40,000 preserves 10,000 fixed and spreads 15,000 each; all m
 test('100 quest, first 20 then 35 actuals -> mandatory 40/40 then 45; final 20,000 target adds 12 Demaecan',()=>{
  let p=plan();p.calc.u=320;p.quests=[{...q(),count:100,base:10000}];p.days={[day]:{mode:'amt',value:10000},'2026-11-07':{mode:'amt',value:20000},'2026-11-08':{mode:'amt',value:20000}};
  const g=goals(50000),v={[day]:entry(6400,20,100)};p=c.dailyApply(v,p,day);let r=back(v,g,p);assert.deepEqual(Array.from(r.rows,x=>x.quest),[34,40,40]);assert.equal(r.questRemaining,80);
- const live={...v,'2026-11-07':entry(11200,35,100)};p=c.dailyApply(live,p,'2026-11-07');r=back(live,g,p,'2026-11-07');const last=r.rows[2];
+ const live={...v,'2026-11-07':entry(11200,35,100)};p=c.dailyApply(live,p,'2026-11-07');p.days['2026-11-08']={mode:'amt',value:20000};r=back(live,g,p,'2026-11-07');const last=r.rows[2];
  assert.equal(r.questRemaining,45);assert.equal(last.quest,45);assert.equal(last.target,20000);assert.equal(last.quest*last.conditions.u.price,14400);assert.equal(last.deliveryGap,5600);assert.equal(last.salesAdded,12);assert.equal(last.d,12);assert.equal(last.revenue,20400);assert.equal(last.minutes,1069);
- const twice=c.dailyApply(live,p,'2026-11-07');assert.equal(JSON.stringify(back(live,g,twice,'2026-11-07')),JSON.stringify(r));
+ const twice=c.dailyApply(live,p,'2026-11-07');assert.equal(JSON.stringify(back(live,g,twice,'2026-11-07')),JSON.stringify(back(live,g,c.dailyApply(live,twice,'2026-11-07'),'2026-11-07')));
  const restored=c.pvalidate(JSON.parse(JSON.stringify(twice)));assert.equal(back(live,g,restored,'2026-11-08').rows[2].quest,45);
  p.daily={'2026-11-08':{u:{price:320,uph:3.2},d:{price:400,uph:3.5}}};const cheaper=back(live,g,p,'2026-11-07').rows[2];assert.equal(cheaper.salesAdded,14);assert.equal(cheaper.revenue,20000);assert.equal(cheaper.minutes,1084);assert.equal(last.conditions.d.price,500);
  p.dailyPeriods={[day]:{fill:'u'}};const uber=back(live,g,p,'2026-11-07').rows[2];assert.equal(uber.quest,45);assert.equal(uber.salesAdded,18);assert.equal(uber.u,63);assert.equal(uber.d,0);

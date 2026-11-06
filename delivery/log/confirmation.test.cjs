@@ -32,9 +32,9 @@ test('confirming Saturday affects later days and leaves earlier automatic Friday
 });
 test('applied actual replaces same-day commitment; repeat snapshots and day rollover use each actual once',()=>{
  const g=goals(55000);let p=quest(plan());p=confirm(counts(p,fri,45,0,g),fri,g);p=confirm(counts(p,sat,35,0,g),sat,g);
- let v={[fri]:entry(12000,20,100)};const live=targets(result(p,g,v));assert.deepEqual(live,[18000,14000,13000]);p=c.dailyApply(v,p,fri);let r=result(p,g,v);assert.deepEqual(targets(r),[18000,14000,19000]);assert.equal(r.rows[2].quest,45);assert.equal(c.dailySummary(v,g,p,fri).remain,6000);
- assert.equal(JSON.stringify(result(c.dailyApply(v,p,fri),g,v)),JSON.stringify(r));v={[fri]:entry(15000,20,100)};assert.equal(result(p,g,v).rows[2].target,19000);p=c.dailyApply(v,p,fri);assert.equal(result(p,g,v).rows[2].target,16000);
- v={[fri]:entry(17000,20,100)};r=result(p,g,v,sat);assert.equal(r.rows[1].target,14000);assert.equal(r.rows[2].target,14000);assert.equal(r.rows[2].quest,45);
+ let v={[fri]:entry(12000,20,100)};const live=targets(result(p,g,v));assert.deepEqual(live,[18000,14000,13000]);p=c.dailyApply(v,p,fri);let r=result(p,g,v);assert.deepEqual(targets(r),[18000,16500,16500]);assert.equal(r.rows[2].quest,40);assert.equal(c.dailySummary(v,g,p,fri).remain,6000);
+ assert.equal(JSON.stringify(result(c.dailyApply(v,p,fri),g,v)),JSON.stringify(r));v={[fri]:entry(15000,20,100)};assert.equal(result(p,g,v).rows[2].target,16500);p=c.dailyApply(v,p,fri);assert.equal(result(p,g,v).rows[2].target,15000);
+ v={[fri]:entry(17000,20,100)};r=result(p,g,v,sat);assert.equal(r.rows[1].target,14000);assert.equal(r.rows[2].target,14000);assert.equal(r.rows[2].quest,40);
 });
 test('edited prices and UPH affect draft target/time immediately but confirmed conditions and Home remain until reconfirmed',()=>{
  let p=confirm(counts(plan(),fri,45,0));p=c.dailyEdit(p,row(p,fri),'u','price',500);p=c.dailyEdit(p,row(p,fri),'u','uph',3.5);assert.equal(row(p,fri).target,22500);assert.equal(row(p,fri).minutes,772);assert.equal(c.dailySummary({},goals(),p,fri).target,18000);
@@ -65,10 +65,10 @@ test('confirmed and pending conditions round-trip with old fields; malformed add
 });
 test('actual reflection and rollover reallocate before a later commitment without changing today target',()=>{
  let p=confirm(counts(plan(),sun,20,0),sun);assert.deepEqual(targets(result(p)),[15000,15000,8000]);
- const v={[fri]:entry(12000,20)};p=c.dailyApply(v,p,fri);assert.deepEqual(targets(result(p,goals(),v)),[15000,25000,8000]);assert.equal(c.dailySummary(v,goals(),p,fri).target,15000);
- p=confirm(counts(p,sun,25,0,goals(),v),sun,goals(),v);assert.deepEqual(targets(result(p,goals(),v)),[15000,25000,10000]);
- p=c.dailyApply(v,p,fri);assert.deepEqual(targets(result(p,goals(),v)),[15000,23000,10000]);
- const next={[fri]:entry(15000,20)};assert.deepEqual(targets(result(p,goals(),next,sat)),[0,20000,10000]);
+ const v={[fri]:entry(12000,20)};p=c.dailyApply(v,p,fri);assert.deepEqual(targets(result(p,goals(),v)),[15000,16500,16500]);assert.equal(c.dailySummary(v,goals(),p,fri).target,15000);
+ p=confirm(counts(p,sun,25,0,goals(),v),sun,goals(),v);assert.deepEqual(targets(result(p,goals(),v)),[15000,16500,10000]);
+ p=c.dailyApply(v,p,fri);assert.deepEqual(targets(result(p,goals(),v)),[15000,16500,16500]);
+ const next={[fri]:entry(15000,20)};assert.deepEqual(targets(result(p,goals(),next,sat)),[0,15000,15000]);
 });
 test('zero or empty typed UPH remains unresolved; positive-count plans cannot be confirmed with zero fare',()=>{
  let p=counts(plan(),fri,45,0);p=c.dailyEdit(p,row(p,fri),'u','uph','0');assert.equal(row(p,fri).minutes,null);assert.equal(row(p,fri).remainingMinutes,null);

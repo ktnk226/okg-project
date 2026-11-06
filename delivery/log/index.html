@@ -657,6 +657,7 @@
       .editor-actions .gen-btn {font-size:17px;min-height:46px;padding:12px;}.editor-actions small {font-size:11px;}
       .editor-company {padding:10px;}.company-inputs {gap:8px;}.company-plan {font-size:12px;}
     }
+    .weekly-actual-chart {overflow-x:auto;} .weekly-actual-chart .sim-bars {min-width:560px;}
   </style>
 </head>
 <body>
@@ -1151,17 +1152,17 @@ function Planner({view,vault,goals,date,p,onChange,onGoalsChange,navigate,error,
         {sum.quotas.map(q=><p className="sim-note" key={q.id}>Uberクエスト：今日あと{q.today}件（期間残り{q.remaining}件／{q.days}稼働日）{q.unallocated?' · 未配分'+q.unallocated+'件。確定件数と残り稼働日を確認してください':''}</p>)}
         {!sum.hasGoal&&<p>週目標を設定すると、今日の必要量が表示されます。</p>}
       </>}
-      <div className="sim-live"><p>今日の超過額 {yen(sum.over)}</p><p>Uber：計画 {sum.row.u}件 ／ 実績 {sum.row.actualU}件 ／ 計画の残り {sum.row.planRemainingU}件（必要配達 {sum.row.remainingU}件）</p><p>出前館：計画 {sum.row.d}件 ／ 実績 {sum.row.actualD}件 ／ 計画の残り {sum.row.planRemainingD}件（必要配達 {sum.row.remainingD}件）</p></div><button className="gen-btn" disabled={!!blocked} onClick={()=>change(dailyApply(vault,p,today))}>売上管理に実績を反映</button><p role="status" className="sim-note">{notice||'実績は入力時に保存されます。このボタンで最新の累計実績を翌日以降の計画に反映します。稼働は継続できます。'}</p>
+      <div className="sim-live"><p>今日の超過額 {yen(sum.over)}</p><p>Uber：計画 {sum.row.u}件 ／ 実績 {sum.row.actualU}件 ／ 計画の残り {sum.row.planRemainingU}件（必要配達 {sum.row.remainingU}件）</p><p>出前館：計画 {sum.row.d}件 ／ 実績 {sum.row.actualD}件 ／ 計画の残り {sum.row.planRemainingD}件（必要配達 {sum.row.remainingD}件）</p></div><button className="gen-btn" disabled={!!blocked} onClick={()=>{if(change(dailyApply(vault,p,today,goals)))setNotice("最新の累計実績で翌日以降を再配分しました。更新した日別計画は未確定です。");}}>売上管理に実績を反映</button><p role="status" className="sim-note">{notice||'実績は入力時に保存されます。このボタンで最新の累計実績を翌日以降の計画に反映します。稼働は継続できます。'}</p>
       <button className="gen-btn sim-open" onClick={()=>navigate('simulation')}>🧮 売上管理 <small>週タブへ →</small></button>
     </div>
   </section>;
   if(view==='settings')return <section className="planner view-container active"><div className="card"><h2>週の単価・UPHプリセット</h2>{p.models.map((m,i)=><div key={i}><h3>{m.name}</h3><div className="grid-3">{['u','d','uph'].map((k,j)=><React.Fragment key={k}>{field(['Uber単価（円）','出前館単価（円）','UPH（件/時）'][j],m[k],v=>change({...p,models:p.models.map((x,z)=>z===i?{...x,[k]:v}:x)}),{step:k==='uph'?'0.1':'any'})}</React.Fragment>)}</div></div>)}</div></section>;
   return <section className="planner view-container active simulation" aria-label="売上管理">
     <div className="sim-heading"><div><h2>🧮 売上管理</h2><p className="sim-note">実績をもとに、次の売上を組み立てる</p></div><button onClick={()=>navigate('dashboard')}>稼働へ →</button></div>
-    <div className="sim-tabs" role="tablist" aria-label="シミュレーションの期間">{[['week','週'],['month','月'],['year','年']].map(([key,label])=><button key={key} id={'sim-tab-'+key} role="tab" aria-selected={tab===key} aria-controls="simulation-panel" tabIndex={tab===key?0:-1} onKeyDown={e=>{const tabs=['week','month','year'];if(e.key==='ArrowRight'||e.key==='ArrowLeft'){e.preventDefault();const next=tabs[(tabs.indexOf(tab)+(e.key==='ArrowRight'?1:2))%3];setTab(next);document.getElementById('sim-tab-'+next).focus();}}} onClick={()=>{setTab(key);setNotice('');}}>{label}<span>{key==='week'?'日別の配分':key==='month'?'月の見通し':'年の見通し'}</span></button>)}</div>
+    <div className="sim-tabs" role="tablist" aria-label="売上管理の期間">{[['week','週'],['month','月'],['year','年']].map(([key,label])=><button key={key} id={'sim-tab-'+key} role="tab" aria-selected={tab===key} aria-controls="simulation-panel" tabIndex={tab===key?0:-1} onKeyDown={e=>{const tabs=['week','month','year'];if(e.key==='ArrowRight'||e.key==='ArrowLeft'){e.preventDefault();const next=tabs[(tabs.indexOf(tab)+(e.key==='ArrowRight'?1:2))%3];setTab(next);document.getElementById('sim-tab-'+next).focus();}}} onClick={()=>{setTab(key);setNotice('');}}>{label}<span>{key==='week'?'日別の配分':key==='month'?'月の見通し':'年の見通し'}</span></button>)}</div>
     <div id="simulation-panel" role="tabpanel" aria-labelledby={'sim-tab-'+tab}>
       <div className="sim-period"><button aria-label="前の期間" onClick={()=>stepPeriod(-1)}>←</button><strong>{tab==='week'?start.slice(5)+' 〜 '+end.slice(5):tab==='month'?simDate.slice(0,7).replace('-','年')+'月':simDate.slice(0,4)+'年'}</strong><button aria-label="次の期間" onClick={()=>stepPeriod(1)}>→</button></div>
-      <div className="sim-period-input"><label>{tab==='week'?'週に含まれる日':tab==='month'?'対象月':'対象年'}<input aria-label="シミュレーション対象期間" type={tab==='week'?'date':tab==='month'?'month':'number'} min={tab==='year'?'2000':undefined} max={tab==='year'?'9999':undefined} value={tab==='week'?simDate:tab==='month'?simDate.slice(0,7):Number(simDate.slice(0,4))} onChange={e=>{const v=e.target.value;if(tab==='year'){if(/^\d{4}$/.test(v)&&Number(v)>=2000)setSimDate(v+'-01-01');}else if(v)setSimDate(tab==='month'?v+'-01':v);}}/></label><button onClick={()=>setSimDate(today)}>今{tab==='week'?'週':tab==='month'?'月':'年'}へ</button></div>
+      <div className="sim-period-input"><label>{tab==='week'?'週に含まれる日':tab==='month'?'対象月':'対象年'}<input aria-label="売上管理対象期間" type={tab==='week'?'date':tab==='month'?'month':'number'} min={tab==='year'?'2000':undefined} max={tab==='year'?'9999':undefined} value={tab==='week'?simDate:tab==='month'?simDate.slice(0,7):Number(simDate.slice(0,4))} onChange={e=>{const v=e.target.value;if(tab==='year'){if(/^\d{4}$/.test(v)&&Number(v)>=2000)setSimDate(v+'-01-01');}else if(v)setSimDate(tab==='month'?v+'-01':v);}}/></label><button onClick={()=>setSimDate(today)}>今{tab==='week'?'週':tab==='month'?'月':'年'}へ</button></div>
       {blocked&&<p className="sim-warning" role="alert">{blocked}</p>}
       <fieldset className="sim-fields" disabled={!!error}>
         {tab!=='week'&&<div className="card sim-overview">
@@ -1171,7 +1172,7 @@ function Planner({view,vault,goals,date,p,onChange,onGoalsChange,navigate,error,
           <SimProgress actual={actual} goal={goal}/>
         </div>}
         {tab==='week'?<>
-          <section className="card"><h3>週間売上実績</h3><p>入力済みの通常売上・報酬のみ。計画・見込みは含みません。</p><strong data-testid="weekly-actual-total">{yen(actual)}</strong><div className="sim-bars">{pdays(start,end).map((d,i)=>{const n=pday(vault,d).total,max=Math.max(1,...pdays(start,end).map(x=>pday(vault,x).total));return <div className="sim-bar-column" key={d}><span>{['月','火','水','木','金','土','日'][i]}</span><small>{d.slice(5)}</small><div className="sim-bar-well"><div className="sim-bar-fill" style={{height:Math.max(0,n)/max*100+'%'}}/></div><small>{yen(n)}</small></div>;})}</div></section>
+          <section className="card"><h3>週間売上実績</h3><p>入力済みの通常売上・報酬のみ。計画・見込みは含みません。</p><strong data-testid="weekly-actual-total">{yen(actual)}</strong><div className="weekly-actual-chart"><div className="sim-bars">{pdays(start,end).map((d,i)=>{const n=pday(vault,d).total,max=Math.max(1,...pdays(start,end).map(x=>pday(vault,x).total));return <div className="sim-bar-column" key={d}><span>{['月','火','水','木','金','土','日'][i]}</span><small>{d.slice(5)}</small><div className="sim-bar-well"><div className="sim-bar-fill" style={{height:Math.max(0,n)/max*100+'%'}}/></div><small>{yen(n)}</small></div>;})}</div></div><p className="sim-note">幅が狭い画面ではグラフを横へスクロールできます。</p></section>
           <DailyPlanningEditor outlook={outlook} vault={vault} goals={goals} p={p} today={today} onChange={change} onActualDate={onActualDate}/>
           <details className="card"><summary>週の売上目標を設定</summary><div className="grid-2">{field('前半の設定目標（月〜木・報酬込み・円）',pgoalParts(goals,simDate).front||'',v=>onGoalsChange(psetPart(goals,simDate,'front',v)),{'data-testid':'front-goal'})}{field('後半の設定目標（金〜日・報酬込み・円）',pgoalParts(goals,simDate).back||'',v=>onGoalsChange(psetPart(goals,simDate,'back',v)),{'data-testid':'back-goal'})}</div><p>週全体の設定目標：{yen(goal)}</p><p className="sim-note">金曜以降、前半不足を後半へ繰り越します。設定目標とクエスト件数は期間ごとに保持します。</p>{!phasSplit(goals,simDate)&&<p className="sim-note">既存の週目標を保持しています。表示は4日・3日の仮内訳です。前半または後半を編集すると、期間別の配分に切り替わります。</p>}</details>
 
@@ -1762,7 +1763,7 @@ function App() {
         <header class="topbar">
           <div>
             <p>Target // {date.replace(/-/g,'/')}</p>
-            <h1>{activeTab==='simulation'?'🧮 売上管理':'🛵 DELIVERY LOG'}</h1>
+            <h1>{activeTab==='simulation'?'🧮 売上管理':activeTab==='dashboard'?'🛵 稼働':'🛵 DELIVERY LOG'}</h1>
           </div>
           <div style={{display:'flex', gap:'10px'}}>
             {isDirty ? (
