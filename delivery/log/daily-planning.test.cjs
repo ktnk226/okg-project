@@ -117,3 +117,8 @@ test('carryover handles year-boundary week and signed sales corrections; month/y
  let r=c.dailyPlan(v,g,p,date,date);assert.equal(r.parts[1].carried,5000);assert.equal(r.parts[1].w.goal,55000);const before=JSON.stringify(r);
  g=c.psetGoal(c.psetGoal(g,date,'month',450000),date,'year',6000000);assert.equal(JSON.stringify(c.dailyPlan(v,g,p,date,date)),before);
 });
+test('Home quest quota excludes Uber sales-supplement deliveries from its mandatory count',()=>{
+ const p=plan();p.calc.u=320;p.quests=[{...q(),count:100,base:10000}];p.days['2026-11-08']={mode:'amt',value:20000};p.dailyPeriods={[day]:{fill:'u'}};
+ const v={[day]:entry(6400,20),'2026-11-07':entry(11200,35)};const s=c.dailySummary(v,goals(50000),p,'2026-11-08');
+ assert.equal(s.row.quest,45);assert.equal(s.row.extraU,18);assert.equal(s.need,63);assert.equal(s.uberNeed,45);assert.equal(s.quotas[0].today,45);assert.equal(s.quotas[0].remaining,45);
+});

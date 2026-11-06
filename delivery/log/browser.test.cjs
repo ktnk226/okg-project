@@ -69,6 +69,8 @@ async function run(browser,mobile){
  await field(sun,'出前館','通常単価（円）').fill('400');assert.match(await row(sun).getByTestId('day-supplement').innerText(),/出前館を追加 14件/);await field(sun,'出前館','通常単価（円）').fill('500');
  await row(sun).scrollIntoViewIfNeeded();await screenshot('carryover-daily-plan');await page.getByRole('button',{name:'ホームへ →',exact:true}).click();
  await uber.locator('input').nth(2).fill('10000');assert.match(await page.getByTestId('home-remaining').innerText(),/8,800/);assert.equal(await page.getByTestId('home-target').innerText(),'20,000円');await page.getByRole('button',{name:'シミュレーションに反映',exact:true}).click();
+ await open();await page.getByRole('group',{name:date+' 不足を補う会社',exact:true}).getByRole('button',{name:/Uber Eats/}).click();
+ await page.clock.setFixedTime(new Date('2026-11-08T03:00:00Z'));await page.reload();await page.getByTestId('home-target').waitFor();assert.equal(await page.getByTestId('home-count').innerText(),'63件');assert.match(await page.locator('.planner-home').innerText(),/Uberクエスト：今日あと45件/);
  const saved=await storage();await page.reload();await page.getByTestId('home-target').waitFor();assert.deepEqual(await storage(),saved);
  await open();const overflow=await page.locator('.daily-editor').evaluate(e=>Array.from(e.querySelectorAll('input,select,button')).filter(x=>x.getBoundingClientRect().width>0&&(x.getBoundingClientRect().right>innerWidth+1||x.getBoundingClientRect().left<0)).map(x=>x.outerHTML.slice(0,100)));assert.deepEqual(overflow,[]);assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
  const settings=()=>page.locator(mobile?'.bottom-nav':'.nav-menu').getByRole('button',{name:mobile?'設定':'⚙️ 設定・同期',exact:true}).click();await settings();
