@@ -1,6 +1,6 @@
 # デリログ：売上シミュレーション
 
-現行の日別計画・実績反映仕様の正本は[Driveの作業資料](https://docs.google.com/document/d/1UptceMRlkVnpmqqXgzuNIlddjVYu7xzDZX3DUkZE97M/edit)です。下記の旧方式の説明は変更履歴として参照してください。現行画面では計画方式・週合計件数の入力を廃止し、`daily-planning.js`で日別計画と明示的な実績反映を計算します。旧計算関数と保存フィールドは互換性検証のため保持しています。
+現行の日別計画・実績反映仕様の正本は[Driveの作業資料](https://docs.google.com/document/d/1UptceMRlkVnpmqqXgzuNIlddjVYu7xzDZX3DUkZE97M/edit)です。下記の旧方式の説明は変更履歴として参照してください。現行画面では計画方式・週合計件数の入力を廃止し、`daily-planning.js`で日別計画と明示的な実績反映を計算します。`simulation-outlook.js`は実績・残り計画・報酬見込みの着地合計と、日別編集時の配分残額を読み取り専用で算出します。旧計算関数と保存フィールドは互換性検証のため保持しています。
 
 現行コードの確認コマンド：
 
@@ -8,6 +8,7 @@
 node delivery/log/planning.test.cjs
 node delivery/log/daily-planning.test.cjs
 node delivery/log/confirmation.test.cjs
+node delivery/log/outlook.test.cjs
 # ローカルHTTPサーバーの公開先を指定。Chromium/Playwrightが必要。
 DELILOG_TEST_URL=http://127.0.0.1:8020/delivery/log/ node delivery/log/browser.test.cjs
 ```
