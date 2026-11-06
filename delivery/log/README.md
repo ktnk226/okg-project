@@ -7,11 +7,12 @@
 ```sh
 node delivery/log/planning.test.cjs
 node delivery/log/daily-planning.test.cjs
+node delivery/log/confirmation.test.cjs
 # ローカルHTTPサーバーの公開先を指定。Chromium/Playwrightが必要。
 DELILOG_TEST_URL=http://127.0.0.1:8020/delivery/log/ node delivery/log/browser.test.cjs
 ```
 
-新しい日別条件・反映スナップショットは既存のplanningキー内に保存し、読み込み時に検証します。完全バックアップは既存v16形式を継続します。 前半不足の繰越額は設定目標へ保存せず、金曜以降に同じ週の保存済み実績から算出します。日別配達目標とUber必須件数を確保して、その日の不足分だけを選択会社の件数へ切り上げ換算します。計算は`daily-planning.test.cjs`、実績修正・日跨ぎ・JSON往復の画面操作は`browser.test.cjs`で検証します。
+日別条件・実績反映スナップショットに加え、編集中の条件（drafts）、確定計画（confirmed）、当日内の再配分基準（planAnchors）を既存のplanningキー内に保存し、読み込み時に検証します。完全バックアップは既存v16形式を継続します。 前半不足の繰越額は設定目標へ保存せず、金曜以降に同じ週の保存済み実績から算出します。日別配達目標とUber必須件数を確保して、その日の不足分だけを選択会社の件数へ切り上げ換算します。計算は`daily-planning.test.cjs`、実績修正・日跨ぎ・JSON往復の画面操作は`browser.test.cjs`で検証します。
 
 「目標管理」「逆算」を「🧮 売上シミュレーション」に統合。週・月・年の3タブで目標を設定します。ホームの日・週・月・年の集計切り替えと、日々の実績入力は継続します。
 

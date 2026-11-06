@@ -600,8 +600,8 @@
 <body>
 <div id="root"></div>
 
-<script src="./simulation-core.js?v=22"></script>
-<script src="./daily-planning.js?v=22"></script>
+<script src="./simulation-core.js?v=23"></script>
+<script src="./daily-planning.js?v=23"></script>
 <script type="text/babel">
 const { useState, useMemo, useEffect, useCallback } = React;
 
@@ -953,10 +953,15 @@ function SimProgress({actual,goal,forecast=0,label='売上の進捗'}) {
 }
 function DailyPlanningEditor({plan,vault,goals,p,today,onChange,onActualDate}) {
   const yen=n=>Math.round(n).toLocaleString()+'円';
-  const edit=(date,key,field,value)=>onChange({...p,daily:{...p.daily,[date]:{...p.daily?.[date],[key]:{...p.daily?.[date]?.[key],[field]:value}}}});
-  const input=(date,key,field,label,placeholder,step=1)=><label>{label}<input aria-label={`${date} ${key==='u'?'Uber':'出前館'} ${label}`} type="number" inputMode="decimal" min="0" step={step} value={p.daily?.[date]?.[key]?.[field]??''} placeholder={String(placeholder)} onChange={e=>{if(e.target.validity.valid)edit(date,key,field,e.target.value);}}/></label>;
+  const [message,setMessage]=useState('');
+  const edit=(row,key,field,value)=>onChange(dailyEdit(p,row,key,field,value));
+  const input=(row,key,field,label,placeholder,step=1)=>{
+    const date=row.date,own=p.drafts?.[date]?.[key]||p.confirmed?.[date]?.[key]||p.daily?.[date]?.[key]||{};
+    return <label>{label}<input aria-label={`${date} ${key==='u'?'Uber':'出前館'} ${label}`} type="number" inputMode="decimal" min="0" step={step} value={own[field]??''} placeholder={String(placeholder)} onChange={e=>{if(e.target.validity.valid)edit(row,key,field,e.target.value);}}/></label>;
+  };
   return <div className="daily-editor">
-    <p className="sim-live">クエストを自動反映し、日別計画を直接調整できます。途中実績だけでは今日の目標・翌日以降の配分は変わりません。翌日以降を更新する場合はホームで「シミュレーションに反映」を押してください。</p>
+    <p className="sim-live">件数を編集すると「件数×日別単価」で配達目標を試算します。金額を入力すると必要件数を逆算します。「計画を確定」で予定を翌日以降へ配分し、ホームの「シミュレーションに反映」では累計実績を使います。途中実績だけでは確定目標・翌日以降の配分は変わりません。</p>
+    {message&&<p className="sim-live" role="status">{message}</p>}
     {plan.parts.map(part=>{
       const start=part.w.start,end=part.w.end;
       const basis=part.reflected||part;
@@ -969,22 +974,26 @@ function DailyPlanningEditor({plan,vault,goals,p,today,onChange,onActualDate}) {
         <p>報酬：入力済み {yen(part.recordedRewards)} ／ 未入力の見込み {yen(part.pendingRewards)}</p>
         <p className="sim-note">見込み報酬を差し引いた配達必要額を日別に配分します。日別の指定額は配達売上だけの目標です。見込みは実績へ自動登録しません。単価未設定の配達は想定売上に含みません。</p>
         <div role="group" aria-label={start+' 不足を補う会社'}><p>不足売上を補う会社</p><div className="grid-2">{[['u','Uber Eats'],['d','出前館']].map(([key,label])=><button key={key} aria-pressed={part.fill===key} onClick={()=>onChange({...p,dailyPeriods:{...p.dailyPeriods,[start]:{fill:key}}})}>{label}{part.fill===key?' ✓':''}</button>)}</div></div>
-        <div className="sim-live" role="status"><p>配達で必要な残額 {yen(basis.delivery)} ／ Uber必須件数の想定売上 {yen(basis.rows.reduce((n,r)=>n+r.quest*r.conditions.u.price,0))}</p><p>クエスト必須分以外の配達：Uber {basis.rows.reduce((n,r)=>n+r.extraU,0)}件 ／ 出前館 {basis.rows.reduce((n,r)=>n+r.extraD,0)}件</p><p>この条件での配達売上見込み {yen(basis.planned)}{!part.carryOut&&<> ／ 配分できない不足額 {yen(part.nextShortfall)}</>}</p><p data-testid={'daily-target-excess-'+start}>日別目標の超過額 {yen(basis.targetExcess)} ／ 件数切り上げ等を含む見込みの超過額 {yen(basis.projectionExcess)}</p>{part.carryOut>0&&<p>前半不足 {yen(part.carryOut)} は後半へ繰越済みです。</p>}{part.nextUnallocatedUber>0&&<p className="sim-warning">Uber必須 {part.nextUnallocatedUber}件を配分できません。期限内の残り稼働日を確認してください。</p>}{basis.w.unallocated>0&&!part.carryOut&&<p className="sim-warning">未配分の目標額 {yen(basis.w.unallocated)}。残り稼働日・日別指定額を確認してください。</p>}</div>
-        {part.reflected&&<p className="sim-note">今日の累計実績を反映済み。翌日以降は再反映までこの見通しを保持します。</p>}
+        <div className="sim-live" role="status"><p>配達で必要な残額 {yen(basis.delivery)} ／ Uber必須件数の想定売上 {yen(basis.rows.reduce((n,r)=>n+r.quest*r.conditions.u.price,0))}</p><p>クエスト必須分以外の配達：Uber {basis.rows.reduce((n,r)=>n+r.extraU,0)}件 ／ 出前館 {basis.rows.reduce((n,r)=>n+r.extraD,0)}件</p><p>この条件での配達売上見込み {yen(basis.planned)}{!part.carryOut&&<> ／ 配分できない不足額 {yen(part.nextShortfall)}</>}</p><p data-testid={'daily-target-excess-'+start}>日別目標の超過額 {yen(basis.targetExcess)} ／ 件数切り上げ等を含む見込みの超過額 {yen(basis.projectionExcess)}</p>{part.carryOut>0&&<p>前半不足 {yen(part.carryOut)} は後半へ繰越済みです。</p>}{part.nextUnallocatedUber>0&&<p className="sim-warning">Uber必須 {part.nextUnallocatedUber}件を配分できません。確定件数と期限内の残り稼働日を確認してください。</p>}{basis.w.unallocated>0&&!part.carryOut&&<p className="sim-warning">未配分の目標額 {yen(basis.w.unallocated)}。残り稼働日・日別指定額を確認してください。</p>}</div>
+        <p className="sim-live" data-testid={'draft-outlook-'+start}>編集中の条件を含む配達売上見込み：{yen(part.draftPlanned)}<br/>翌日以降の配分・ホームの目標は、計画の確定まで維持します。</p>
+        {part.reflected&&<p className="sim-note">今日の累計実績を反映済み。同日の確定計画は加算せず実績を優先します。以後の途中実績は再反映まで翌日以降へ反映しません。</p>}
         <div className="sim-day-list">{part.rows.filter(r=>r.date>=today).map(r=><article className={'sim-day '+(r.date===today?'is-today':'')} key={r.date} data-testid={'allocation-'+r.date}>
           <div className="sim-day-heading"><h4>{r.date.slice(5)}{r.date===today?' · 今日':''}</h4><span>配達実績 {yen(r.actual)}</span></div>
-          <label>稼働予定<select aria-label={r.date+'の稼働予定'} value={r.setting.mode==='off'?'off':'auto'} onChange={e=>onChange({...p,days:{...p.days,[r.date]:e.target.value==='off'?{...r.setting,mode:'off',resumeMode:r.setting.mode}:{...r.setting,mode:r.setting.resumeMode||'auto'}}})}><option value="auto">稼働する</option><option value="off">休み</option></select></label>
+          <p data-testid="day-plan-state" className="sim-note">{r.draft?(r.confirmed?'確定後の編集・未反映':'編集中・未確定'):r.confirmed?'確定済み':'自動配分・未確定'}{r.confirmed&&<> ／ 確定目標 {yen(r.confirmed.target)} · Uber {r.confirmed.u.count}件・出前館 {r.confirmed.d.count}件</>}</p>
+          <label>稼働予定<select aria-label={r.date+'の稼働予定'} value={r.setting.mode==='off'?'off':'auto'} onChange={e=>{const s=pdaySetting(p,goals,r.date);onChange({...p,days:{...p.days,[r.date]:e.target.value==='off'?{...s,mode:'off',resumeMode:s.mode}:{...s,mode:s.resumeMode||'auto'}}});}}><option value="auto">稼働する</option><option value="off">休み</option></select></label>
           <div className="sim-day-target"><span>この日の配達売上目標（クエスト報酬を除く）</span><strong data-testid="day-target">{r.setting.mode==='off'?'休み':yen(r.target)}</strong></div>
           {r.setting.mode!=='off'&&<>
-            <label>配達売上目標を指定（円・空欄で自動）<input aria-label={r.date+'の目標金額'} type="number" min="0" step="1" value={r.setting.mode==='amt'?r.setting.value:''} placeholder={String(r.target)} onChange={e=>{if(e.target.validity.valid)onChange({...p,days:{...p.days,[r.date]:{mode:e.target.value===''?'auto':'amt',value:e.target.value}}});}}/></label>
-            <p className="sim-note">指定金額は目標超過時も保持します。指定件数は最低限の計画として保持し、クエスト必須分・売上目標に足りない件数を自動追加します。</p>
-            {['u','d'].map(key=><div className="platform-block" key={key}><h4>{key==='u'?'Uber Eats':'出前館'}</h4><div className="grid-3">{input(r.date,key,'count','計画件数（空欄で自動）',r[key])}{input(r.date,key,'price','通常単価（円）',r.conditions[key].price,'any')}{input(r.date,key,'uph','UPH（件/時）',r.conditions[key].uph,'0.1')}</div><p data-testid={r.date+'-'+key+'-counts'}>計画 {r[key]}件 ／ 実績 {key==='u'?r.actualU:r.actualD}件 ／ 残り {key==='u'?r.planRemainingU:r.planRemainingD}件</p><p>想定売上 {yen(r[key]*r.conditions[key].price)} ／ 計画時間 {dailyTime(dailyMinutes(key==='u'?r.u:0,key==='d'?r.d:0,r.conditions))}</p>{key==='u'&&<p className="sim-note" data-testid="day-quest">クエスト必須 {r.quest}件 ＋ 必須分以外 {r.extraU}件</p>}</div>)}
+            <label>配達売上目標を指定して逆算（円・空欄で自動）<input aria-label={r.date+'の目標金額'} type="number" min="0" step="1" value={r.draft?(r.draft.basis==='amount'?r.draft.target:''):r.confirmed?(r.confirmed.basis==='amount'?r.confirmed.target:''):r.setting.mode==='amt'?r.setting.value:''} placeholder={String(r.target)} onChange={e=>{if(e.target.validity.valid)edit(r,'target',null,e.target.value);}}/></label>
+            <p className="sim-note">{r.draft?.basis==='counts'||!r.draft&&r.confirmed?.basis==='counts'?'件数から試算中：入力件数の合計売上を目標にします。':'売上目標から逆算中：Uber必須分を確保し、不足額を選択した会社で補います。'} 金額・件数の変更は編集中として保存されます。確定後も編集・再確定できます。</p>
+            {['u','d'].map(key=><div className="platform-block" key={key}><h4>{key==='u'?'Uber Eats':'出前館'}</h4><div className="grid-3">{input(r,key,'count','計画件数（空欄で自動）',r[key])}{input(r,key,'price','通常単価（円）',r.conditions[key].price,'any')}{input(r,key,'uph','UPH（件/時）',r.conditions[key].uph,'0.1')}</div><p data-testid={r.date+'-'+key+'-counts'}>計画 {r[key]}件 ／ 実績 {key==='u'?r.actualU:r.actualD}件 ／ 残り {key==='u'?r.planRemainingU:r.planRemainingD}件</p><p>想定売上 {yen(r[key]*r.conditions[key].price)} ／ 計画時間 {dailyTime(dailyMinutes(key==='u'?r.u:0,key==='d'?r.d:0,r.conditions))}</p>{key==='u'&&<p className="sim-note" data-testid="day-quest">クエスト必須 {r.quest}件 ＋ 必須分以外 {r.extraU}件</p>}</div>)}
             <div className="sim-live" data-testid="day-supplement"><p>Uber必須 {r.quest}件 × {yen(r.conditions.u.price)} ＝ {yen(r.quest*r.conditions.u.price)}</p><p>必須・指定件数を確保した後の不足額 {yen(r.deliveryGap||0)} → {r.fill==='u'?'Uber Eats':'出前館'}を追加 {r.salesAdded||0}件</p><p>両社の想定配達売上 <strong data-testid="day-projection">{yen(r.revenue)}</strong> ／ 計画時間 {dailyTime(r.minutes)}</p></div>
             <SimProgress actual={r.actual} goal={r.target} forecast={Math.max(0,r.revenue-r.actual)} label="日別配達売上の見通し"/>
             <div className="sim-day-result"><strong>残り {yen(r.remaining)}</strong><span>超過 {yen(r.over)}</span><span>必要時間 {r.missingPrice?'単価未設定':dailyTime(r.remainingMinutes)}</span><span>必要配達：Uber {r.remainingU}件 ／ 出前館 {r.remainingD}件</span>{r.missingPrice&&<p role="alert">不足を補う会社の単価を設定してください。</p>}</div>
             <label>この日のプリセット<select aria-label={r.date+' プリセット'} defaultValue={p.model} id={'daily-model-'+r.date}>{p.models.map((m,i)=><option key={i} value={i}>{m.name}</option>)}</select></label>
-            <button onClick={()=>{const model=p.models[Number(document.getElementById('daily-model-'+r.date).value)];const current=p.daily?.[r.date]||{};onChange({...p,daily:{...p.daily,[r.date]:{...current,u:{...current.u,price:model.u,uph:model.uph},d:{...current.d,price:model.d,uph:model.uph}}}});}}>この日だけにプリセットを適用</button>
-            <button onClick={()=>{const current=p.daily?.[r.date]||{};onChange({...p,daily:{...p.daily,[r.date]:{...current,u:{...current.u,count:''},d:{...current.d,count:''}}}});}}>この日の件数を自動配分に戻す</button>
+            <button onClick={()=>{const model=p.models[Number(document.getElementById('daily-model-'+r.date).value)];let next=p;for(const key of ['u','d'])for(const field of ['price','uph'])next=dailyEdit(next,r,key,field,field==='price'?model[key]:model.uph);onChange(next);}}>この日だけにプリセットを適用</button>
+            <button onClick={()=>edit(r,'target',null,r.target)}>この日の件数を売上目標から再計算</button>
+            <button className="gen-btn" data-testid="confirm-plan" onClick={()=>{try{if(onChange(dailyConfirm(vault,goals,p,r.date,today))!==false)setMessage(r.date+'の計画を確定しました。翌日以降の未確定日に再配分しました。実績への登録・稼働終了は行いません。');}catch(e){setMessage(r.date+'：'+e.message);}}}>計画を確定</button><p className="sim-note" role="status">{message.startsWith(r.date)?message:r.draft?'この日の変更は未確定です。':r.confirmed?'この日の計画は確定済みです。':'自動配分の計画です。'}</p>
+            {r.confirmed&&<button onClick={()=>{onChange(dailyRelease(p,r.date));setMessage(r.date+'の確定を解除しました。');}}>確定を解除</button>}
           </>}
           <button className="sim-text-button" onClick={()=>onActualDate(r.date)}>ホームで実績を入力 →</button>
         </article>)}</div>
@@ -998,7 +1007,7 @@ function Planner({view,vault,goals,date,p,onChange,onGoalsChange,navigate,error,
   const [tab,setTab]=useState('week'),[simDate,setSimDate]=useState(today),[notice,setNotice]=useState('');
   useEffect(()=>{if(view==='simulation'){setTab('week');setSimDate(today);}},[view,today]);
   const yen=n=>Math.round(n).toLocaleString()+'円';
-  const change=next=>{try{pvalidate(next);const issue=plinkCheck(next,vault);if(issue)throw Error(issue);if(onChange(next)!==false)setNotice('変更を保存しました。配分・見込みに反映済みです。');}catch(e){setNotice(e.message);}};
+  const change=next=>{try{pvalidate(next);const issue=plinkCheck(next,vault);if(issue)throw Error(issue);if(onChange(next)===false)return false;const editing=Object.entries(next.drafts||{}).some(([d,v])=>JSON.stringify(v)!==JSON.stringify(p.drafts?.[d]));setNotice(editing?'編集中の条件を保存しました。「計画を確定」で翌日以降へ反映できます。':'変更を保存しました。配分・見込みに反映済みです。');return true;}catch(e){setNotice(e.message);return false;}};
   const field=(label,value,fn,opts={})=><label>{label}<input type="number" inputMode="decimal" min="0" step="1" value={value} onChange={e=>{if(e.target.validity.valid)fn(e.target.value);}} {...opts}/></label>;
   const calc=(key,value)=>change({...p,calc:{...p.calc,[key]:value}});
   const dayChange=(d,setting)=>change({...p,days:{...p.days,[d]:setting}});
@@ -1027,7 +1036,7 @@ function Planner({view,vault,goals,date,p,onChange,onGoalsChange,navigate,error,
         <SimProgress actual={sum.actual} goal={sum.target}/><p className="sim-note">入力済み配達実績 {yen(sum.actual)} · 報酬は期間目標で別に計算します</p>
         <div className="today-metrics"><div><span>残り必要件数</span><strong data-testid="home-count">{!sum.hasGoal&&!sum.uberNeed?'—':sum.need===null?'単価を設定':sum.need+'件'}</strong></div><div><span>残り必要時間</span><strong data-testid="home-time">{!sum.hasGoal&&!sum.uberNeed?'—':sum.time}</strong></div></div>
         {sum.reason&&<p className="sim-warning">{sum.reason}</p>}
-        {sum.quotas.map(q=><p className="sim-note" key={q.id}>Uberクエスト：今日あと{q.today}件（期間残り{q.remaining}件／{q.days}稼働日）{q.unallocated?' · 稼働予定がなく配分できません':''}</p>)}
+        {sum.quotas.map(q=><p className="sim-note" key={q.id}>Uberクエスト：今日あと{q.today}件（期間残り{q.remaining}件／{q.days}稼働日）{q.unallocated?' · 未配分'+q.unallocated+'件。確定件数と残り稼働日を確認してください':''}</p>)}
         {!sum.hasGoal&&<p>週目標を設定すると、今日の必要量が表示されます。</p>}
       </>}
       <div className="sim-live"><p>今日の超過額 {yen(sum.over)}</p><p>Uber：計画 {sum.row.u}件 ／ 実績 {sum.row.actualU}件 ／ 計画の残り {sum.row.planRemainingU}件（必要配達 {sum.row.remainingU}件）</p><p>出前館：計画 {sum.row.d}件 ／ 実績 {sum.row.actualD}件 ／ 計画の残り {sum.row.planRemainingD}件（必要配達 {sum.row.remainingD}件）</p></div><button className="gen-btn" disabled={!!blocked} onClick={()=>change(dailyApply(vault,p,today))}>シミュレーションに反映</button><p role="status" className="sim-note">{notice||'実績は入力時に保存されます。このボタンで最新の累計実績を翌日以降の計画に反映します。稼働は継続できます。'}</p>
