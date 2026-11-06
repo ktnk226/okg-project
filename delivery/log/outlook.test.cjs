@@ -17,10 +17,10 @@ test('front/back/whole week landings and differences include carry once, with se
 test('ongoing day landing adds actual delivery to remaining company counts, rather than the full plan again',()=>{
  const v=vault();v[fri]={sets:[{u_cum:2500,u_cnt_cum:5,d_cum:1200,d_cnt_cum:2}]};const b=out(full(),v).parts[1],r=b.landings[0];assert.equal(r.actualDelivery,3700);assert.equal(r.remainingU,15);assert.equal(r.remainingD,0);assert.equal(r.remainingDelivery,6000);assert.equal(r.total,9700);assert.equal(b.total,51700);assert.equal(b.actualQuestRemaining,95);
 });
-test('explicitly reflected day uses actual only, repeated apply and rollover never add its confirmed plan',()=>{
- const v=vault();v[fri]={sets:[{u_cum:2500,u_cnt_cum:5,d_cum:1200,d_cnt_cum:2}]};let p=c.dailyApply(v,full(),fri);const o=out(p,v),b=o.parts[1];assert.equal(b.total,45700);assert.equal(b.landings[0].remainingDelivery,0);assert.equal(b.afterConfirmedDelivery,9300);assert.equal(b.afterConfirmedUber,15);
+test('reflected ongoing day retains remaining plan; rollover uses saved actual only',()=>{
+ const v=vault();v[fri]={sets:[{u_cum:2500,u_cnt_cum:5,d_cum:1200,d_cnt_cum:2}]};let p=c.dailyApply(v,full(),fri);const o=out(p,v),b=o.parts[1];assert.equal(b.total,51700);assert.equal(b.landings[0].remainingDelivery,6000);assert.equal(b.afterConfirmedDelivery,9300);assert.equal(b.afterConfirmedUber,15);
  assert.equal(JSON.stringify(out(c.dailyApply(v,p,fri),v)),JSON.stringify(o));assert.equal(out(p,v,sat).parts[1].total,45700);
- v[fri].sets[0].u_cum=3000;v[fri].sets[0].u_cnt_cum=6;const updated=out(p,v).parts[1];assert.equal(updated.total,46200);assert.equal(updated.actualQuestRemaining,94);assert.equal(updated.afterConfirmedUber,15);
+ v[fri].sets[0].u_cum=3000;v[fri].sets[0].u_cnt_cum=6;const updated=out(p,v).parts[1];assert.equal(updated.total,51800);assert.equal(updated.actualQuestRemaining,94);assert.equal(updated.afterConfirmedUber,15);
 });
 test('recorded and pending quest rewards partition the same budget without double counting',()=>{
  const p=full(),v=vault();v[fri]=entry(2500,5,4000);let b=out(p,v).parts[1];assert.equal(b.actualRewards,4000);assert.equal(b.forecastRewards,6000);assert.equal(b.rewardTotal,10000);const total=b.total;
