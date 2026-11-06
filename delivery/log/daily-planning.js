@@ -12,16 +12,16 @@ function dailyMinutes(u,d,conditions) {
   return Math.ceil((u/(uphU||1)+d/(uphD||1))*60);
 }
 function dailyTime(minutes) {return minutes===null?'UPH未設定':Math.floor(minutes/60)+'時間'+minutes%60+'分';}
-function dailyPeriod(vault,goals,p,date,cursor,range,rewardDate=cursor,release=null) {
+function dailyPeriod(vault,goals,p,date,cursor,range,rewardDate=cursor,release=null,openLater=false) {
   // A confirmation reserves its amount only while it is current: made today,
   // and (for later days) before any change to today's actuals. Otherwise the
   // day absorbs the latest carry-over and keeps only its fares and UPH.
   const seen=pday(vault,rewardDate).total;
-  const open=d=>{if(release===null)return false;const s=p.confirmed[d];return s.on!==rewardDate||d>=release&&s.seen!==seen;};
+  const open=d=>{if(release===null)return false;const s=p.confirmed[d];return s.on!==rewardDate||d>=release&&(openLater||s.seen!==seen);};
   const confirmedDays=Object.keys(p.confirmed||{}).filter(d=>d>=cursor&&d>=range[0]&&d<=range[1]&&pdaySetting(p,goals,d).mode!=='off').sort();
   const saved=confirmedDays.filter(d=>!open(d));
   const anchor=p.planAnchors?.[range[0]];
-  const held=anchor?.asOf===rewardDate?Object.fromEntries(Object.entries(anchor.held).filter(([d])=>d>=cursor&&!(release!==null&&d>=release&&anchor.seen!==seen)&&pdaySetting(p,goals,d).mode!=='off')):{};
+  const held=anchor?.asOf===rewardDate?Object.fromEntries(Object.entries(anchor.held).filter(([d])=>d>=cursor&&!(release!==null&&d>=release&&(openLater||anchor.seen!==seen))&&pdaySetting(p,goals,d).mode!=='off')):{};
   let effective=p;
   if(confirmedDays.length||Object.keys(held).length){
     // A confirmation affects that day and later days only. Earlier automatic
@@ -99,7 +99,10 @@ function dailyPlan(vault,goals,p,date,today,includeDrafts=true) {
     const live=dailyHasActual(vault,today)?vault[today]:null;
     if(live&&today>=range[0]&&today<=range[1]){
       const reflected=dailyPeriod({...past,[today]:live},goals,p,date,tomorrow,range,today,tomorrow);
-      original.rows=original.rows.map(r=>r.date>today?reflected.rows.find(x=>x.date===r.date):r);
+      // baseTarget: the same later days if today ends exactly on its target,
+      // so the difference shown is only today's carry-over.
+      const base=dailyPeriod(past,goals,p,date,today,range,today,tomorrow,true);
+      original.rows=original.rows.map(r=>r.date>today?{...reflected.rows.find(x=>x.date===r.date),baseTarget:base.rows.find(x=>x.date===r.date).target}:r);
       original.reflected=reflected;
     }
     const display=original.reflected||original;
