@@ -3,7 +3,7 @@
 function simulationQuestTarget(q) {return q.aim==='n'||q.status==='miss'?0:pn(q.count)+(q.aim==='extra'?10:0);}
 function simulationQuota(q,rows) {return rows.filter(r=>r.date>=q.start&&r.date<=q.end).reduce((n,r)=>n+r.u,0);}
 function simulationLanding(row,vault,today,applied) {
-  const actual=pday(vault,row.date),usePlan=row.eligible&&!(row.date===today&&applied);
+  const actual=pday(vault,row.date),usePlan=row.eligible;
   const remainingU=usePlan?Math.max(0,row.u-actual.u.cnt):0,remainingD=usePlan?Math.max(0,row.d-actual.d.cnt):0;
   const remainingDelivery=remainingU*row.conditions.u.price+remainingD*row.conditions.d.price;
   return {date:row.date,actualDelivery:actual.real,actualRewards:actual.que,actual:actual.total,remainingU,remainingD,remainingDelivery,total:actual.total+remainingDelivery,actualOnly:!usePlan,incompletePrices:remainingU>0&&!row.conditions.u.price||remainingD>0&&!row.conditions.d.price};

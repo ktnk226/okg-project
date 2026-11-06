@@ -664,7 +664,7 @@
 
 <script src="./simulation-core.js?v=24"></script>
 <script src="./daily-planning.js?v=24"></script>
-<script src="./simulation-outlook.js?v=24"></script>
+<script src="./simulation-outlook.js?v=25"></script>
 <script type="text/babel">
 const { useState, useMemo, useEffect, useCallback } = React;
 
@@ -1032,7 +1032,7 @@ function SimulationTotalCard({title,data,id}) {
       <div><dt>今後の計画配達売上</dt><dd data-testid={id+'-planned-delivery'}>{yen(data.futureDelivery)}</dd></div>
       <div><dt>入力済み報酬</dt><dd data-testid={id+'-recorded-rewards'}>{yen(data.actualRewards)}</dd></div>
       <div><dt>未入力のクエスト見込み</dt><dd data-testid={id+'-forecast-rewards'}>{yen(data.forecastRewards)}</dd></div>
-    </dl><p className="sim-note">途中の日は実績＋残り計画件数×単価。実績反映済みの日と過去の日は実績だけを採用します。見込み報酬は達成前提です。</p>
+    </dl><p className="sim-note">途中の日は実績＋残り計画件数×単価。実績反映は翌日以降の再配分に使用します。当日は反映後も実績＋残り計画を採用し、過去の日は実績だけを採用します。見込み報酬は達成前提です。</p>
     {data.landings&&data.landings.map(r=><p className="sim-note" key={r.date}>{r.date.slice(5)}：実績 {yen(r.actual)} ＋ 残り計画 {yen(r.remainingDelivery)}{r.actualOnly?'（実績を採用）':''}</p>)}
     </details>
   </section>;
