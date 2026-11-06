@@ -31,12 +31,12 @@ test('live actuals hold today goal and immediately carry shortfall or excess to 
 test('example: 30,000 over 3 days with 90 quest deliveries worth 9,000 -> 7,000/day; 5,000 today carries 2,000 to later days',()=>{
  const p={...plan(),calc:{u:300,d:500,uph:3,company:'u',share:100}};p.quests=[{...q(),count:90,base:9000}];const g=goals(30000);
  assert.deepEqual(Array.from(back({},g,p).rows,x=>x.target),[7000,7000,7000]);
- const v={[day]:entry(5000,17)};let r=back(v,g,p);assert.deepEqual(Array.from(r.rows,x=>x.target),[7000,8000,8000]);assert.equal(r.rows[1].quest+r.rows[2].quest,73);
+ const v={[day]:entry(5000,17)};let r=back(v,g,p);assert.deepEqual(Array.from(r.rows,x=>x.target),[7000,8000,8000]);assert.equal(r.rows[1].quest+r.rows[2].quest,73);assert.deepEqual(Array.from(r.rows.slice(1),x=>x.baseTarget),[7000,7000]);
  assert.equal(JSON.stringify(back(v,g,p)),JSON.stringify(r));assert.equal(v[day].sets[0].u_cum,5000);
  r=back(v,g,p,'2026-11-07');assert.deepEqual(Array.from(r.rows.filter(x=>x.eligible),x=>x.target),[8000,8000]);
  let confirmed=c.dailyConfirm({},g,p,day,day);for(const d of ['2026-11-07','2026-11-08'])confirmed=c.dailyConfirm({},g,confirmed,d,day);
  assert.deepEqual(Array.from(back({},g,confirmed).rows,x=>x.target),[7000,7000,7000]);
- assert.deepEqual(Array.from(back(v,g,confirmed).rows,x=>x.target),[7000,8000,8000]);
+ assert.deepEqual(Array.from(back(v,g,confirmed).rows,x=>x.target),[7000,8000,8000]);assert.deepEqual(Array.from(back(v,g,confirmed).rows.slice(1),x=>x.baseTarget),[7000,7000]);
  assert.deepEqual(Array.from(back(v,g,confirmed,'2026-11-07').rows.filter(x=>x.eligible),x=>x.target),[8000,8000]);
  const reconfirmed=c.dailyConfirm(v,g,confirmed,'2026-11-07',day);assert.deepEqual(Array.from(back(v,g,reconfirmed).rows,x=>x.target),[7000,8000,8000]);assert.equal(reconfirmed.confirmed['2026-11-07'].target,8000);
 });
