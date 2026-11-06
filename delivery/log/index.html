@@ -663,8 +663,8 @@
 <div id="root"></div>
 
 <script src="./simulation-core.js?v=24"></script>
-<script src="./daily-planning.js?v=24"></script>
-<script src="./simulation-outlook.js?v=25"></script>
+<script src="./daily-planning.js?v=26"></script>
+<script src="./simulation-outlook.js?v=26"></script>
 <script type="text/babel">
 const { useState, useMemo, useEffect, useCallback } = React;
 
@@ -1100,7 +1100,7 @@ function DailyPlanningEditor({outlook,vault,goals,p,today,onChange,onActualDate}
           {['u','d'].map(key=><div className="editor-company" key={key}><h4>{key==='u'?'Uber Eats':'出前館'}</h4><div className="company-inputs">{input(row,key,'count','計画件数（空欄で自動）',row[key])}{input(row,key,'price','通常単価（円）',row.conditions[key].price,'any')}{input(row,key,'uph','UPH（件/時）',row.conditions[key].uph,'0.1')}</div><p className="company-plan">想定売上 {yen(row[key]*row.conditions[key].price)}{key==='u'&&<span data-testid="day-quest"> ／ 必須 {row.quest}件 ＋ 追加 {row.extraU}件</span>}</p></div>)}
           <div className="editor-fill" role="group" aria-label={part.w.start+' 不足を補う会社'}><span>不足売上を補う会社</span>{[['u','Uber Eats'],['d','出前館']].map(([key,label])=><button key={key} aria-pressed={part.fill===key} onClick={()=>onChange({...p,dailyPeriods:{...p.dailyPeriods,[part.w.start]:{fill:key}}})}>{label}</button>)}</div>
           <details><summary>金額を指定して件数を逆算</summary><label>配達売上目標（円・空欄で自動）<input aria-label={row.date+'の目標金額'} type="number" min="0" step="1" value={row.draft?(row.draft.basis==='amount'?row.draft.target:''):row.confirmed?(row.confirmed.basis==='amount'?row.confirmed.target:''):row.setting.mode==='amt'?row.setting.value:''} placeholder={String(row.target)} onChange={e=>{if(e.target.validity.valid)edit(row,'target',null,e.target.value);}}/></label><button onClick={()=>edit(row,'target',null,row.target)}>この金額から件数を再計算</button></details>
-          <details><summary>プリセット・計算内訳・今日の残り</summary><p className="sim-note">件数入力は件数×単価で目標を試算し、金額入力は必要件数を逆算します。変更は確定までホームと翌日以降へ反映しません。</p>
+          <details><summary>プリセット・計算内訳・今日の残り</summary><p className="sim-note">件数入力は件数×単価で目標を試算し、金額入力は必要件数を逆算します。変更は確定まで稼働と翌日以降へ反映しません。</p>
             <p data-testid="day-supplement">必須・指定件数の売上に対する不足 {yen(row.deliveryGap||0)} → {row.fill==='u'?'Uber Eats':'出前館'}を追加 {row.salesAdded||0}件</p><p>両社の想定配達売上 <strong data-testid="day-projection">{yen(row.revenue)}</strong></p><p>入力済み配達実績 {yen(row.actual)} ／ 今日の残り {yen(row.remaining)} ／ 必要時間 {row.missingPrice?'単価未設定':dailyTime(row.remainingMinutes)}</p><p>Uber：計画 {row.u}件・実績 {row.actualU}件・残り {row.planRemainingU}件 ／ 出前館：計画 {row.d}件・実績 {row.actualD}件・残り {row.planRemainingD}件</p>
             <label>この日のプリセット<select aria-label={row.date+' プリセット'} defaultValue={p.model} id={'daily-model-'+row.date}>{p.models.map((m,i)=><option key={i} value={i}>{m.name}</option>)}</select></label><button onClick={()=>{const model=p.models[Number(document.getElementById('daily-model-'+row.date).value)];let next=p;for(const key of ['u','d'])for(const field of ['price','uph'])next=dailyEdit(next,row,key,field,field==='price'?model[key]:model.uph);onChange(next);}}>この日だけにプリセットを適用</button>
           </details>
@@ -1109,7 +1109,7 @@ function DailyPlanningEditor({outlook,vault,goals,p,today,onChange,onActualDate}
 
           {row.confirmed&&<button className="sim-text-button" onClick={()=>{if(onChange(dailyRelease(p,row.date))!==false)setMessage(row.date+'の確定を解除しました。');}}>確定を解除</button>}
         </>}
-        <button className="sim-text-button" onClick={()=>onActualDate(row.date)}>ホームで実績を入力 →</button>
+        <button className="sim-text-button" onClick={()=>onActualDate(row.date)}>稼働で実績を入力 →</button>
       </article>}
     </section>
   </div>;
@@ -1151,13 +1151,13 @@ function Planner({view,vault,goals,date,p,onChange,onGoalsChange,navigate,error,
         {sum.quotas.map(q=><p className="sim-note" key={q.id}>Uberクエスト：今日あと{q.today}件（期間残り{q.remaining}件／{q.days}稼働日）{q.unallocated?' · 未配分'+q.unallocated+'件。確定件数と残り稼働日を確認してください':''}</p>)}
         {!sum.hasGoal&&<p>週目標を設定すると、今日の必要量が表示されます。</p>}
       </>}
-      <div className="sim-live"><p>今日の超過額 {yen(sum.over)}</p><p>Uber：計画 {sum.row.u}件 ／ 実績 {sum.row.actualU}件 ／ 計画の残り {sum.row.planRemainingU}件（必要配達 {sum.row.remainingU}件）</p><p>出前館：計画 {sum.row.d}件 ／ 実績 {sum.row.actualD}件 ／ 計画の残り {sum.row.planRemainingD}件（必要配達 {sum.row.remainingD}件）</p></div><button className="gen-btn" disabled={!!blocked} onClick={()=>change(dailyApply(vault,p,today))}>シミュレーションに反映</button><p role="status" className="sim-note">{notice||'実績は入力時に保存されます。このボタンで最新の累計実績を翌日以降の計画に反映します。稼働は継続できます。'}</p>
-      <button className="gen-btn sim-open" onClick={()=>navigate('simulation')}>🧮 売上シミュレーション <small>週タブへ →</small></button>
+      <div className="sim-live"><p>今日の超過額 {yen(sum.over)}</p><p>Uber：計画 {sum.row.u}件 ／ 実績 {sum.row.actualU}件 ／ 計画の残り {sum.row.planRemainingU}件（必要配達 {sum.row.remainingU}件）</p><p>出前館：計画 {sum.row.d}件 ／ 実績 {sum.row.actualD}件 ／ 計画の残り {sum.row.planRemainingD}件（必要配達 {sum.row.remainingD}件）</p></div><button className="gen-btn" disabled={!!blocked} onClick={()=>change(dailyApply(vault,p,today))}>売上管理に実績を反映</button><p role="status" className="sim-note">{notice||'実績は入力時に保存されます。このボタンで最新の累計実績を翌日以降の計画に反映します。稼働は継続できます。'}</p>
+      <button className="gen-btn sim-open" onClick={()=>navigate('simulation')}>🧮 売上管理 <small>週タブへ →</small></button>
     </div>
   </section>;
   if(view==='settings')return <section className="planner view-container active"><div className="card"><h2>週の単価・UPHプリセット</h2>{p.models.map((m,i)=><div key={i}><h3>{m.name}</h3><div className="grid-3">{['u','d','uph'].map((k,j)=><React.Fragment key={k}>{field(['Uber単価（円）','出前館単価（円）','UPH（件/時）'][j],m[k],v=>change({...p,models:p.models.map((x,z)=>z===i?{...x,[k]:v}:x)}),{step:k==='uph'?'0.1':'any'})}</React.Fragment>)}</div></div>)}</div></section>;
-  return <section className="planner view-container active simulation" aria-label="売上シミュレーション">
-    <div className="sim-heading"><div><h2>🧮 売上シミュレーション</h2><p className="sim-note">実績をもとに、次の売上を組み立てる</p></div><button onClick={()=>navigate('dashboard')}>ホームへ →</button></div>
+  return <section className="planner view-container active simulation" aria-label="売上管理">
+    <div className="sim-heading"><div><h2>🧮 売上管理</h2><p className="sim-note">実績をもとに、次の売上を組み立てる</p></div><button onClick={()=>navigate('dashboard')}>稼働へ →</button></div>
     <div className="sim-tabs" role="tablist" aria-label="シミュレーションの期間">{[['week','週'],['month','月'],['year','年']].map(([key,label])=><button key={key} id={'sim-tab-'+key} role="tab" aria-selected={tab===key} aria-controls="simulation-panel" tabIndex={tab===key?0:-1} onKeyDown={e=>{const tabs=['week','month','year'];if(e.key==='ArrowRight'||e.key==='ArrowLeft'){e.preventDefault();const next=tabs[(tabs.indexOf(tab)+(e.key==='ArrowRight'?1:2))%3];setTab(next);document.getElementById('sim-tab-'+next).focus();}}} onClick={()=>{setTab(key);setNotice('');}}>{label}<span>{key==='week'?'日別の配分':key==='month'?'月の見通し':'年の見通し'}</span></button>)}</div>
     <div id="simulation-panel" role="tabpanel" aria-labelledby={'sim-tab-'+tab}>
       <div className="sim-period"><button aria-label="前の期間" onClick={()=>stepPeriod(-1)}>←</button><strong>{tab==='week'?start.slice(5)+' 〜 '+end.slice(5):tab==='month'?simDate.slice(0,7).replace('-','年')+'月':simDate.slice(0,4)+'年'}</strong><button aria-label="次の期間" onClick={()=>stepPeriod(1)}>→</button></div>
@@ -1171,6 +1171,7 @@ function Planner({view,vault,goals,date,p,onChange,onGoalsChange,navigate,error,
           <SimProgress actual={actual} goal={goal}/>
         </div>}
         {tab==='week'?<>
+          <section className="card"><h3>週間売上実績</h3><p>入力済みの通常売上・報酬のみ。計画・見込みは含みません。</p><strong data-testid="weekly-actual-total">{yen(actual)}</strong><div className="sim-bars">{pdays(start,end).map((d,i)=>{const n=pday(vault,d).total,max=Math.max(1,...pdays(start,end).map(x=>pday(vault,x).total));return <div className="sim-bar-column" key={d}><span>{['月','火','水','木','金','土','日'][i]}</span><small>{d.slice(5)}</small><div className="sim-bar-well"><div className="sim-bar-fill" style={{height:Math.max(0,n)/max*100+'%'}}/></div><small>{yen(n)}</small></div>;})}</div></section>
           <DailyPlanningEditor outlook={outlook} vault={vault} goals={goals} p={p} today={today} onChange={change} onActualDate={onActualDate}/>
           <details className="card"><summary>週の売上目標を設定</summary><div className="grid-2">{field('前半の設定目標（月〜木・報酬込み・円）',pgoalParts(goals,simDate).front||'',v=>onGoalsChange(psetPart(goals,simDate,'front',v)),{'data-testid':'front-goal'})}{field('後半の設定目標（金〜日・報酬込み・円）',pgoalParts(goals,simDate).back||'',v=>onGoalsChange(psetPart(goals,simDate,'back',v)),{'data-testid':'back-goal'})}</div><p>週全体の設定目標：{yen(goal)}</p><p className="sim-note">金曜以降、前半不足を後半へ繰り越します。設定目標とクエスト件数は期間ごとに保持します。</p>{!phasSplit(goals,simDate)&&<p className="sim-note">既存の週目標を保持しています。表示は4日・3日の仮内訳です。前半または後半を編集すると、期間別の配分に切り替わります。</p>}</details>
 
@@ -1182,7 +1183,7 @@ function Planner({view,vault,goals,date,p,onChange,onGoalsChange,navigate,error,
             <p data-testid={'quest-progress-'+q.id}>対象実績 {count}件 ／ {target}件（出前館などは対象外）</p><div className="sim-progress" role="progressbar" aria-label="Uberクエスト件数" aria-valuenow={count} aria-valuemin={0} aria-valuemax={Math.max(target,count)}><span className="sim-progress-actual" style={{width:Math.min(100,count/Math.max(1,target)*100)+'%'}}/></div>
             <div className="grid-3"><label>基本の対象回数<select aria-label="基本の対象回数" value={q.count} onChange={e=>qchange(q.id,'count',Number(e.target.value))}>{Array.from({length:12},(_,i)=>(i+1)*10).map(n=><option key={n} value={n}>{n}回</option>)}</select></label>{field('基本達成報酬（円）',q.base,v=>qchange(q.id,'base',v))}{field('追加10回の報酬（円）',q.extra,v=>qchange(q.id,'extra',v))}</div>
             <div className="grid-2"><label>目指す段階<select aria-label="目指す段階" value={q.aim} onChange={e=>qchange(q.id,'aim',e.target.value)}><option value="n">見込みに含めない</option><option value="base">基本達成</option><option value="extra">追加10回まで</option></select></label><label>結果の確認<select aria-label="結果の確認" value={q.status} onChange={e=>qchange(q.id,'status',e.target.value)}><option value="n">挑戦中（見込み）</option><option value="base">基本達成を確認</option><option value="extra">追加達成を確認</option><option value="miss">未達</option></select></label></div>
-            <div className="sim-stats"><div><span>入力済み確定報酬</span><strong>{yen(recorded)}</strong></div><div><span>未入力の報酬見込み</span><strong>{yen(pending)}</strong></div></div><p className="sim-note">達成の確認だけでは実績売上に加算されません。報酬の実績入力はホームで行ってください。</p>
+            <div className="sim-stats"><div><span>入力済み確定報酬</span><strong>{yen(recorded)}</strong></div><div><span>未入力の報酬見込み</span><strong>{yen(pending)}</strong></div></div><p className="sim-note">達成の確認だけでは実績売上に加算されません。報酬の実績入力は稼働で行ってください。</p>
             <details><summary>対象外件数・別日の報酬紐付け</summary>{field('Uber累計から除く対象外件数',q.adjust,v=>qchange(q.id,'adjust',v))}<p className="sim-note">期間外の日に入力済みのUber報酬を紐付けると、その分の見込みを控除します。</p>{q.links.map((l,i)=><div className="sim-link" key={i}><label>報酬の入力日<input type="date" value={l.date} onChange={e=>e.target.value&&qchange(q.id,'links',q.links.map((v,j)=>i===j?{...v,date:e.target.value}:v))}/></label>{field('紐付ける入力済み報酬（円）',l.amount,v=>qchange(q.id,'links',q.links.map((x,j)=>i===j?{...x,amount:v}:x)))}<button onClick={()=>qchange(q.id,'links',q.links.filter((_,j)=>i!==j))}>紐付けを解除</button></div>)}<button onClick={()=>qchange(q.id,'links',[...q.links,{date:today,amount:0}])}>別日の報酬を紐付ける</button></details>
             <button className="sim-text-button" onClick={()=>{if(confirm('クエスト設定を削除しますか？入力済みの売上実績は保持されます。'))change({...p,quests:p.quests.filter(x=>x.id!==q.id)});}}>クエスト設定を削除</button>
           </div>;})}
@@ -1747,12 +1748,12 @@ function App() {
           </div>
         </div>
         <nav class="nav-menu">
-          <button class={`nav-item ${activeTab === 'dashboard' ? 'active' : ''}`} onClick={() => setActiveTab('dashboard')}>📊 ホーム</button>
+          <button class={`nav-item ${activeTab === 'dashboard' ? 'active' : ''}`} onClick={() => setActiveTab('dashboard')}>📊 稼働</button>
           <button class={`nav-item ${activeTab === 'memos' ? 'active' : ''}`} onClick={() => setActiveTab('memos')}>📝 メモ / Inbox</button>
           <button class={`nav-item ${activeTab === 'expenses' ? 'active' : ''}`} onClick={() => setActiveTab('expenses')}>🧾 経費</button>
           <button class={`nav-item ${activeTab === 'calendar' ? 'active' : ''}`} onClick={() => setActiveTab('calendar')}>📅 カレンダー</button>
           <button class={`nav-item ${activeTab === 'settings' ? 'active' : ''}`} onClick={() => setActiveTab('settings')}>⚙️ 設定・同期</button>
-          <button className={`nav-item ${activeTab==='simulation'?'active':''}`} aria-current={activeTab==='simulation'?'page':undefined} onClick={() => setActiveTab('simulation')}>🧮 売上シミュレーション</button>
+          <button className={`nav-item ${activeTab==='simulation'?'active':''}`} aria-current={activeTab==='simulation'?'page':undefined} onClick={() => setActiveTab('simulation')}>🧮 売上管理</button>
         </nav>
       </aside>
 
@@ -1761,7 +1762,7 @@ function App() {
         <header class="topbar">
           <div>
             <p>Target // {date.replace(/-/g,'/')}</p>
-            <h1>{activeTab==='simulation'?'🧮 売上シミュレーション':'🛵 DELIVERY LOG'}</h1>
+            <h1>{activeTab==='simulation'?'🧮 売上管理':'🛵 DELIVERY LOG'}</h1>
           </div>
           <div style={{display:'flex', gap:'10px'}}>
             {isDirty ? (
@@ -2164,9 +2165,9 @@ function App() {
         {/* BOTTOM NAV TABS */}
         <nav class="bottom-nav">
           <button class={`tab-btn ${activeTab === 'dashboard' ? 'active' : ''}`} onClick={() => setActiveTab('dashboard')}>
-            <svg class="nav-icon" viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg><span>ホーム</span>
+            <svg class="nav-icon" viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg><span>稼働</span>
           </button>
-          <button className={`tab-btn ${activeTab === 'simulation' ? 'active' : ''}`} aria-current={activeTab==='simulation'?'page':undefined} onClick={() => setActiveTab('simulation')}><span aria-hidden="true" className="sim-nav-icon">🧮</span><span>売上シミュレーション</span></button>
+          <button className={`tab-btn ${activeTab === 'simulation' ? 'active' : ''}`} aria-current={activeTab==='simulation'?'page':undefined} onClick={() => setActiveTab('simulation')}><span aria-hidden="true" className="sim-nav-icon">🧮</span><span>売上管理</span></button>
           <button class={`tab-btn ${activeTab === 'memos' ? 'active' : ''}`} onClick={() => setActiveTab('memos')}>
             <svg class="nav-icon" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg><span>メモ</span>
           </button>

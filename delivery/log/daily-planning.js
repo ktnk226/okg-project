@@ -137,7 +137,15 @@ function dailyApply(vault,p,today) {
   // automatic days to the actual-based reallocation. A later plan confirmation
   // may establish a new baseline for its preceding, still-open days.
   const planAnchors=Object.fromEntries(Object.entries(p.planAnchors||{}).map(([start,a])=>[start,start<=today&&a.end>=today&&a.asOf===today?{...a,afterApply:false}:a]));
-  return {...p,...(p.planAnchors?{planAnchors}:{}),applied:{...p.applied,[today]:{record}}};
+  const end=pdate(prange(today,'week')[0],new Date(today+'T12:00:00').getDay()>=1&&new Date(today+'T12:00:00').getDay()<=4?3:6);
+  const confirmed={...p.confirmed},drafts={...p.drafts},daily={...p.daily},days={...p.days};
+  for(const date of pdays(pdate(today,1),end)){
+    const saved=confirmed[date],conditions=saved||daily[date]||{};
+    daily[date]={...daily[date],u:{...conditions.u,count:''},d:{...conditions.d,count:''}};
+    if(days[date]?.mode!=='off')days[date]={mode:'auto',value:''};
+    delete confirmed[date];delete drafts[date];
+  }
+  return {...p,confirmed,drafts,daily,days,...(p.planAnchors?{planAnchors}:{}),applied:{...p.applied,[today]:{record}}};
 }
 function dailyDraftRow(row,draft) {
   const condition=c=>({...c,price:pn(c.price),uph:pn(c.uph)});
