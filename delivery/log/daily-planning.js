@@ -28,40 +28,45 @@ function dailyPeriod(vault,goals,p,date,cursor,range,rewardDate=cursor) {
     const fixed=eligible.filter(r=>r.conditions.u.count!=='');
     for(const r of fixed){const n=Math.min(left,pn(r.conditions.u.count));r.quest+=n;left-=n;}
     const free=eligible.filter(r=>r.conditions.u.count==='');
-    const part=free.length?Math.ceil(left/free.length):0;
-    for(const r of free){const n=Math.min(left,part);r.quest+=n;left-=n;}
+    // Manual counts are retained. They cannot cap the mandatory quest quota:
+    // if every working day is specified, spread the remaining obligation too.
+    const receivers=free.length?free:eligible;
+    const part=receivers.length?Math.ceil(left/receivers.length):0;
+    for(const r of receivers){const n=Math.min(left,part);r.quest+=n;left-=n;}
     unallocatedUber+=left;
   }
-  for(const r of active){r.u=r.conditions.u.count===''?r.quest:pn(r.conditions.u.count);r.d=pn(r.conditions.d.count);}
+  for(const r of active){r.u=Math.max(r.quest,pn(r.conditions.u.count));r.d=pn(r.conditions.d.count);}
   const planned=()=>active.reduce((n,r)=>n+r.u*r.conditions.u.price+r.d*r.conditions.d.price,0);
   const delivery=Math.max(0,w.goal-w.actual-w.forecast);
-  let missing=Math.max(0,delivery-planned());
-  const free=active.filter(r=>r.conditions[fill].count==='');
-  const weights=free.map(r=>Math.max(0,r.target-r.u*r.conditions.u.price-r.d*r.conditions.d.price));
-  for(let i=0;i<free.length;i++){
-    const r=free[i],price=r.conditions[fill].price;
-    if(!price)continue;
-    const weightLeft=weights.slice(i).reduce((a,b)=>a+b,0);
-    const share=weightLeft>0?weights[i]/weightLeft:1/(free.length-i);
-    const count=Math.ceil(missing*share/price);
-    r[fill]+=count;
-    if(fill==='u')r.extraU+=count;else r.extraD+=count;
-    missing=Math.max(0,missing-count*price);
+  for(const r of active){
+    // Each daily delivery target is independent of quest rewards and other
+    // days' rounding/overages. Never shrink a manually specified money target.
+    r.deliveryGap=Math.max(0,r.target-r.u*r.conditions.u.price-r.d*r.conditions.d.price);
+    const price=r.conditions[fill].price;
+    r.salesAdded=price?Math.ceil(r.deliveryGap/price):0;
+    r[fill]+=r.salesAdded;
   }
   for(const r of rows){
     r.revenue=r.u*r.conditions.u.price+r.d*r.conditions.d.price;
     r.minutes=dailyMinutes(r.u,r.d,r.conditions);
     r.extraU=r.u-r.quest;r.extraD=r.d;
+    r.dayShortfall=r.eligible?Math.max(0,r.target-r.revenue):0;
   }
-  return {w,rows,fill,delivery,planned:planned(),shortfall:Math.max(0,delivery-planned()),unallocatedUber};
+  return {w,rows,fill,delivery,planned:planned(),shortfall:w.unallocated+active.reduce((n,r)=>n+r.dayShortfall,0),targetExcess:w.excess,projectionExcess:Math.max(0,planned()-delivery),unallocatedUber};
 }
 function dailyPlan(vault,goals,p,date,today) {
   const past=Object.fromEntries(Object.entries(vault).filter(([d])=>d<today));
   const ranges=ppartRanges(goals,date);
   // Legacy whole-week goals remain unchanged until the split targets are edited.
-  if(!phasSplit(goals,date))ranges.splice(0,2,[...prange(date,'week'),pgoal(goals,date,'week')]);
-  const parts=ranges.map(range=>{
+  const split=phasSplit(goals,date);
+  if(!split)ranges.splice(0,2,[...prange(date,'week'),pgoal(goals,date,'week')]);
+  // Derive the carry from saved actuals only after Mon–Thu has ended. Do not
+  // persist it into the configured goal, snapshots, or the next week's quest.
+  const carry=split&&today>ranges[0][1]?Math.max(0,ranges[0][2]-pactual(past,ranges[0][0],ranges[0][1])):0;
+  const parts=ranges.map((configured,index)=>{
+    const carried=index===1?carry:0,range=[configured[0],configured[1],configured[2]+carried];
     const original=dailyPeriod(past,goals,p,date,today,range);
+    original.configuredGoal=configured[2];original.carried=carried;original.carryOut=index===0?carry:0;
     const snapshot=p.applied?.[today];
     if(snapshot&&today>=range[0]&&today<=range[1]){
       const reflected=dailyPeriod({...past,[today]:snapshot.record},goals,p,date,pdate(today,1),range,today);
@@ -73,11 +78,15 @@ function dailyPlan(vault,goals,p,date,today) {
     original.nextUnallocatedUber=display.unallocatedUber;
     for(const r of original.rows){
       const actual=pday(vault,r.date);
-      r.actual=actual.total;r.actualU=actual.u.cnt;r.actualD=actual.d.cnt;
+      // Targets are delivery-only. Recorded quest rewards are already credited
+      // at period level and must not reduce today's delivery remainder again.
+      r.actual=actual.real;r.actualTotal=actual.total;r.actualU=actual.u.cnt;r.actualD=actual.d.cnt;
       r.remaining=Math.max(0,r.target-r.actual);r.over=Math.max(0,r.actual-r.target);
       r.planRemainingU=r.eligible?Math.max(0,r.u-r.actualU):0;
       r.planRemainingD=r.eligible?Math.max(0,r.d-r.actualD):0;
-      r.remainingU=r.eligible?Math.max(0,r.quest-r.actualU):0;r.remainingD=0;
+      const questActual=original.w.quests.reduce((n,{q})=>n+(r.date>=q.start&&r.date<=q.end?Math.max(0,pprogress(vault,q,r.date)-pprogress(vault,q,pdate(r.date,-1))):0),0);
+      r.remainingQuest=r.eligible?Math.max(0,r.quest-questActual):0;
+      r.remainingU=r.remainingQuest;r.remainingD=0;
       let uncovered=r.eligible?Math.max(0,r.remaining-r.remainingU*r.conditions.u.price):0;
       for(const key of [r.fill==='u'?'d':'u',r.fill]){
         const price=r.conditions[key].price,field=key==='u'?'remainingU':'remainingD';
@@ -109,6 +118,7 @@ function dailyValidate(p) {
   const obj=v=>v&&typeof v==='object'&&!Array.isArray(v);
   const date=d=>/^\d{4}-\d{2}-\d{2}$/.test(d)&&pdate(d)===d;
   for(const name of ['daily','dailyPeriods','applied'])if(p[name]!==undefined&&!obj(p[name]))throw Error('日別計画の形式が不正です');
+  for(const s of Object.values(p.days))if(s.resumeMode!==undefined&&!['auto','amt','cnt'].includes(s.resumeMode))throw Error('稼働再開時の設定が不正です');
   for(const [d,settings] of Object.entries(p.daily||{})){
     if(!date(d)||!obj(settings))throw Error('日別計画の日付が不正です');
     for(const key of ['u','d'])if(settings[key]!==undefined){
