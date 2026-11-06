@@ -131,13 +131,21 @@ function dailySummary(vault,goals,p,today) {
   const plan=dailyPlan(vault,goals,p,today,today,false),r=plan.rows.find(x=>x.date===today);
   return {plan,row:r,target:r.target,actual:r.actual,remain:r.remaining,over:r.over,hasGoal:pgoal(goals,today,'week')>0||r.fixed!==null,off:r.setting.mode==='off',manual:r.fixed!==null,need:r.missingPrice?null:r.remainingU+r.remainingD,time:r.missingPrice?'単価未設定':dailyTime(r.remainingMinutes),uberNeed:r.remainingQuest,reason:r.missingPrice?'不足売上を補う会社の通常単価を設定してください。':'',quotas:plan.parts.filter(part=>today>=part.w.start&&today<=part.w.end&&part.w.quests.length).map(part=>({id:part.w.start,today:r.remainingQuest,remaining:part.questRemaining,days:part.rows.filter(x=>x.eligible).length,unallocated:part.nextUnallocatedUber}))};
 }
-function dailyApply(vault,p,today) {
+function dailyApply(vault,p,today,goals=null) {
   const record=JSON.parse(JSON.stringify(vault[today]||{sets:[]}));
   // Keep the earlier-day baseline for today's goal, while releasing future
   // automatic days to the actual-based reallocation. A later plan confirmation
   // may establish a new baseline for its preceding, still-open days.
   const planAnchors=Object.fromEntries(Object.entries(p.planAnchors||{}).map(([start,a])=>[start,start<=today&&a.end>=today&&a.asOf===today?{...a,afterApply:false}:a]));
-  return {...p,...(p.planAnchors?{planAnchors}:{}),applied:{...p.applied,[today]:{record}}};
+  const end=pdate(prange(today,'week')[0],goals&&!phasSplit(goals,today)?6:new Date(today+'T12:00:00').getDay()>=1&&new Date(today+'T12:00:00').getDay()<=4?3:6);
+  const confirmed={...p.confirmed},drafts={...p.drafts},daily={...p.daily},days={...p.days};
+  for(const date of pdays(pdate(today,1),end)){
+    const saved=confirmed[date],base=daily[date]||{},pending=drafts[date]||{},conditions={u:{...base.u,...saved?.u,...pending.u},d:{...base.d,...saved?.d,...pending.d}};
+    daily[date]={...daily[date],u:{...conditions.u,count:''},d:{...conditions.d,count:''}};
+    if(days[date]?.mode!=='off')days[date]={mode:'auto',value:''};else days[date]={...days[date],resumeMode:'auto'};
+    delete confirmed[date];delete drafts[date];
+  }
+  return {...p,confirmed,drafts,daily,days,...(p.planAnchors?{planAnchors}:{}),applied:{...p.applied,[today]:{record}}};
 }
 function dailyDraftRow(row,draft) {
   const condition=c=>({...c,price:pn(c.price),uph:pn(c.uph)});

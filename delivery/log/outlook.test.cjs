@@ -18,9 +18,9 @@ test('ongoing day landing adds actual delivery to remaining company counts, rath
  const v=vault();v[fri]={sets:[{u_cum:2500,u_cnt_cum:5,d_cum:1200,d_cnt_cum:2}]};const b=out(full(),v).parts[1],r=b.landings[0];assert.equal(r.actualDelivery,3700);assert.equal(r.remainingU,15);assert.equal(r.remainingD,0);assert.equal(r.remainingDelivery,6000);assert.equal(r.total,9700);assert.equal(b.total,51700);assert.equal(b.actualQuestRemaining,95);
 });
 test('reflected ongoing day retains remaining plan; rollover uses saved actual only',()=>{
- const v=vault();v[fri]={sets:[{u_cum:2500,u_cnt_cum:5,d_cum:1200,d_cnt_cum:2}]};let p=c.dailyApply(v,full(),fri);const o=out(p,v),b=o.parts[1];assert.equal(b.total,51700);assert.equal(b.landings[0].remainingDelivery,6000);assert.equal(b.afterConfirmedDelivery,9300);assert.equal(b.afterConfirmedUber,15);
- assert.equal(JSON.stringify(out(c.dailyApply(v,p,fri),v)),JSON.stringify(o));assert.equal(out(p,v,sat).parts[1].total,45700);
- v[fri].sets[0].u_cum=3000;v[fri].sets[0].u_cnt_cum=6;const updated=out(p,v).parts[1];assert.equal(updated.total,51800);assert.equal(updated.actualQuestRemaining,94);assert.equal(updated.afterConfirmedUber,15);
+ const v=vault();v[fri]={sets:[{u_cum:2500,u_cnt_cum:5,d_cum:1200,d_cnt_cum:2}]};let p=c.dailyApply(v,full(),fri);const o=out(p,v),b=o.parts[1];assert.equal(b.total,61200);assert.equal(b.landings[0].remainingDelivery,6000);assert.equal(b.afterConfirmedDelivery,41300);assert.equal(b.afterConfirmedUber,95);
+ assert.equal(JSON.stringify(out(c.dailyApply(v,p,fri),v)),JSON.stringify(o));assert.equal(out(p,v,sat).parts[1].total,55200);
+ v[fri].sets[0].u_cum=3000;v[fri].sets[0].u_cnt_cum=6;const updated=out(p,v).parts[1];assert.equal(updated.total,61300);assert.equal(updated.actualQuestRemaining,94);assert.equal(updated.afterConfirmedUber,95);
 });
 test('recorded and pending quest rewards partition the same budget without double counting',()=>{
  const p=full(),v=vault();v[fri]=entry(2500,5,4000);let b=out(p,v).parts[1];assert.equal(b.actualRewards,4000);assert.equal(b.forecastRewards,6000);assert.equal(b.rewardTotal,10000);const total=b.total;
