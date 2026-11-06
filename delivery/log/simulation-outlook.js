@@ -3,7 +3,8 @@
 function simulationQuestTarget(q) {return q.aim==='n'||q.status==='miss'?0:pn(q.count)+(q.aim==='extra'?10:0);}
 function simulationQuota(q,rows) {return rows.filter(r=>r.date>=q.start&&r.date<=q.end).reduce((n,r)=>n+r.u,0);}
 function simulationLanding(row,vault,today,applied) {
-  const actual=pday(vault,row.date),usePlan=row.eligible;
+  // Today's unfinished plan is already carried to later days once actuals exist.
+  const actual=pday(vault,row.date),usePlan=row.eligible&&!(applied&&row.date===today);
   const remainingU=usePlan?Math.max(0,row.u-actual.u.cnt):0,remainingD=usePlan?Math.max(0,row.d-actual.d.cnt):0;
   const remainingDelivery=remainingU*row.conditions.u.price+remainingD*row.conditions.d.price;
   return {date:row.date,actualDelivery:actual.real,actualRewards:actual.que,actual:actual.total,remainingU,remainingD,remainingDelivery,total:actual.total+remainingDelivery,actualOnly:!usePlan,incompletePrices:remainingU>0&&!row.conditions.u.price||remainingD>0&&!row.conditions.d.price};
@@ -11,12 +12,12 @@ function simulationLanding(row,vault,today,applied) {
 function simulationOutlook(vault,goals,p,date,today) {
   const plan=dailyPlan(vault,goals,p,date,today),committed=dailyPlan(vault,goals,p,date,today,false);
   const allocationVault=Object.fromEntries(Object.entries(vault).filter(([d])=>d<today));
-  if(p.applied?.[today])allocationVault[today]=p.applied[today].record;
+  if(dailyHasActual(vault,today))allocationVault[today]=vault[today];
   const parts=plan.parts.map((part,index)=>{
     const basePart=committed.parts[index],basis=basePart.reflected||basePart;
     const active=basis.rows.filter(r=>r.eligible),fixed=active.filter(r=>r.confirmed);
     const quests=basis.w.quests.map(({q})=>({q,remaining:Math.max(0,simulationQuestTarget(q)-pprogress(allocationVault,q,today)),actualRemaining:Math.max(0,simulationQuestTarget(q)-pprogress(vault,q,today))}));
-    const landings=part.rows.map(r=>simulationLanding(r,vault,today,!!p.applied?.[today]));
+    const landings=part.rows.map(r=>simulationLanding(r,vault,today,dailyHasActual(vault,today)));
     const sum=k=>landings.reduce((n,r)=>n+r[k],0);
     const actual=sum('actual'),actualDelivery=sum('actualDelivery'),actualRewards=sum('actualRewards'),futureDelivery=sum('remainingDelivery'),forecastRewards=part.pendingRewards;
     const total=actual+futureDelivery+forecastRewards,goal=part.w.goal;

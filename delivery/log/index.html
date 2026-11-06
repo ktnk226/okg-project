@@ -521,6 +521,12 @@
     .sim-bar-fill {width:100%;background:#7199ba;display:flex;align-items:flex-end;transition:height .2s;}
     .sim-bar-fill i {display:block;width:100%;background:#85c7ae;}
     .sim-bar-column.is-today strong {background:#365d7d;border-radius:5px;width:100%;}
+    .carry-preview {margin-top:12px;padding:14px 16px;border:1px solid var(--border2);border-radius:12px;background:var(--surface2);}
+    .carry-preview>p:first-child {font-size:15px;margin-bottom:10px;}
+    .carry-preview ul {list-style:none;display:grid;gap:6px;}
+    .carry-preview li {display:grid;grid-template-columns:auto 1fr;column-gap:12px;align-items:baseline;}
+    .carry-preview li strong {font-family:var(--font-mono);font-size:18px;text-align:right;}
+    .carry-preview li small {grid-column:1/-1;color:var(--muted);}
     .sim-live {padding:14px;background:#233d42;border:1px solid #41686b;border-radius:10px;margin:16px 0;color:#e0f0ed;}
     .sim-warning {padding:12px 14px;border:1px solid #897855;border-radius:8px;color:#ead9b8;background:#342f25;margin:12px 0;}
     .sim-day-list {margin:20px 0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;}
@@ -1088,12 +1094,12 @@ function DailyPlanningEditor({outlook,vault,goals,p,today,onChange,onActualDate}
         <h3 ref={editorRef} tabIndex="-1" className="editor-scroll-anchor" id="selected-day-heading">{row.date.slice(5)}の計画を編集</h3>{badges(row,true)}
         <div className="editor-toolbar">
         <div className="editor-budget" data-testid="day-allocation-budget" aria-live="polite">
-          <div><span>{budget.sourceActual?'翌日以降へ配分できる残り':'この日へ配分できる残り'}</span><strong data-testid="day-budget-money">{yen(budget.unassignedDelivery)}</strong><span data-testid="day-budget-uber">Uber {budget.unassignedUber}件</span></div>
-          <div><span>{budget.sourceActual?'今日は実績を優先（計画は加算しない）':'この日の計画を採用した後'}</span><strong data-testid="day-after-money">{yen(budget.afterDelivery)}</strong><span data-testid="day-after-uber">Uber {budget.afterUber}件 ／ 残り未確定 {budget.remainingDays}日</span></div>
+          <div><span>{budget.sourceActual?'今日の実績を引いた翌日以降の残り':'この日へ配分できる残り'}</span><strong data-testid="day-budget-money">{yen(budget.unassignedDelivery)}</strong><span data-testid="day-budget-uber">Uber {budget.unassignedUber}件</span></div>
+          <div><span>{budget.sourceActual?'今日は実績で計算（不足は翌日以降へ）':'この日の計画を採用した後'}</span><strong data-testid="day-after-money">{yen(budget.afterDelivery)}</strong><span data-testid="day-after-uber">Uber {budget.afterUber}件 ／ 残り未確定 {budget.remainingDays}日</span></div>
         </div>
         {row.setting.mode!=='off'&&<div className="editor-actions"><button className="gen-btn" data-testid="confirm-plan" onClick={confirm}>計画を確定して次の日へ</button><small>{row.draft?'変更は未確定です':row.confirmed?'確定済み · 編集・再確定できます':'未確定 · 予定を次の日以降へ配分します'}</small></div>}
         </div>
-        {budget.sourceActual&&<p className="sim-note">今日は実績反映済みのため、残りの計算では今日の確定計画を加算しません。</p>}
+        {budget.sourceActual&&<p className="sim-note">今日の実績を入力済みのため、今日の不足・超過は翌日以降の目標に自動で反映しています。</p>}
         <details><summary>配分前の額・他の日の確定計画</summary><dl className="outlook-breakdown"><div><dt>その日以降で必要な配達売上</dt><dd>{yen(budget.onwardDelivery)}</dd></div><div><dt>その日以降のUber必要件数</dt><dd>{budget.onwardUber}件</dd></div><div><dt>他の日の確定配達目標（期間全体）</dt><dd>{yen(budget.otherConfirmedTarget)}</dd></div><div><dt>他の日の確定Uber（期間全体）</dt><dd>{budget.otherConfirmedUber}件</dd></div></dl>{budget.beforeProvisional>0&&<p className="sim-note">先行する未確定日の仮配分 {yen(budget.beforeProvisional)} も保持しています。</p>}</details>
         <div className="editor-target"><span>この日の配達売上目標（報酬を除く）</span><strong data-testid="day-target">{row.setting.mode==='off'?'休み':yen(row.target)}</strong><span>計画時間 {dailyTime(row.minutes)}</span></div>
         <label>稼働予定<select aria-label={row.date+'の稼働予定'} value={row.setting.mode==='off'?'off':'auto'} onChange={e=>{const s=pdaySetting(p,goals,row.date);onChange({...p,days:{...p.days,[row.date]:e.target.value==='off'?{...s,mode:'off',resumeMode:s.mode}:{...s,mode:s.resumeMode||'auto'}}});}}><option value="auto">稼働する</option><option value="off">休み</option></select></label>
@@ -1152,7 +1158,7 @@ function Planner({view,vault,goals,date,p,onChange,onGoalsChange,navigate,error,
         {sum.quotas.map(q=><p className="sim-note" key={q.id}>Uberクエスト：今日あと{q.today}件（期間残り{q.remaining}件／{q.days}稼働日）{q.unallocated?' · 未配分'+q.unallocated+'件。確定件数と残り稼働日を確認してください':''}</p>)}
         {!sum.hasGoal&&<p>週目標を設定すると、今日の必要量が表示されます。</p>}
       </>}
-      <div className="sim-live"><p>今日の超過額 {yen(sum.over)}</p><p>Uber：計画 {sum.row.u}件 ／ 実績 {sum.row.actualU}件 ／ 計画の残り {sum.row.planRemainingU}件（必要配達 {sum.row.remainingU}件）</p><p>出前館：計画 {sum.row.d}件 ／ 実績 {sum.row.actualD}件 ／ 計画の残り {sum.row.planRemainingD}件（必要配達 {sum.row.remainingD}件）</p></div><button className="gen-btn" disabled={!!blocked} onClick={()=>{if(change(dailyApply(vault,p,today,goals)))setNotice("最新の累計実績で翌日以降を再配分しました。更新した日別計画は未確定です。");}}>売上管理に実績を反映</button><p role="status" className="sim-note">{notice||'実績は入力時に保存されます。このボタンで最新の累計実績を翌日以降の計画に反映します。稼働は継続できます。'}</p>
+      <div className="sim-live"><p>今日の超過額 {yen(sum.over)}</p><p>Uber：計画 {sum.row.u}件 ／ 実績 {sum.row.actualU}件 ／ 計画の残り {sum.row.planRemainingU}件（必要配達 {sum.row.remainingU}件）</p><p>出前館：計画 {sum.row.d}件 ／ 実績 {sum.row.actualD}件 ／ 計画の残り {sum.row.planRemainingD}件（必要配達 {sum.row.remainingD}件）</p></div>{(()=>{const next=sum.plan.rows.filter(r=>r.date>today&&r.eligible&&r.date<=pdate(today,6));return next.length?<div className="carry-preview" data-testid="carry-preview"><p>{sum.remain>0?<>今日の不足 <strong>{yen(sum.remain)}</strong> を明日以降に上乗せ中</>:sum.over>0?<>今日の超過 <strong>{yen(sum.over)}</strong> を明日以降から差し引き中</>:'今日の目標どおりなら明日以降は変わりません'}</p><ul>{next.map(r=>{const days=['日','月','火','水','木','金','土'];return <li key={r.date} data-testid={'carry-'+r.date}><span>{r.date.slice(5).replace('-','/')}（{days[new Date(r.date+'T12:00:00').getDay()]}）</span><strong>{yen(r.target)}</strong><small>Uber {r.u}件{r.d?' · 出前館 '+r.d+'件':''}</small></li>;})}</ul><p className="sim-note">実績を入力すると自動で再計算します。今の実績で今日を終えた場合の目標です。</p></div>:null;})()}
       <button className="gen-btn sim-open" onClick={()=>navigate('simulation')}>🧮 売上管理 <small>週タブへ →</small></button>
     </div>
   </section>;
@@ -1749,7 +1755,7 @@ function App() {
           </div>
         </div>
         <nav class="nav-menu">
-          <button class={`nav-item ${activeTab === 'dashboard' ? 'active' : ''}`} onClick={() => setActiveTab('dashboard')}>📊 稼働</button>
+          <button class={`nav-item ${activeTab === 'dashboard' ? 'active' : ''}`} onClick={() => setActiveTab('dashboard')}>🛵 稼働</button>
           <button class={`nav-item ${activeTab === 'memos' ? 'active' : ''}`} onClick={() => setActiveTab('memos')}>📝 メモ / Inbox</button>
           <button class={`nav-item ${activeTab === 'expenses' ? 'active' : ''}`} onClick={() => setActiveTab('expenses')}>🧾 経費</button>
           <button class={`nav-item ${activeTab === 'calendar' ? 'active' : ''}`} onClick={() => setActiveTab('calendar')}>📅 カレンダー</button>
@@ -1860,7 +1866,7 @@ function App() {
           </div>
         )}
 
-        {/* ── TAB 1: DASHBOARD (HOME) ── */}
+        {/* ── TAB 1: 稼働 (work entry) ── */}
 
         <div class={`view-container ${activeTab === 'dashboard' ? 'active' : ''}`}>
           
@@ -2166,7 +2172,7 @@ function App() {
         {/* BOTTOM NAV TABS */}
         <nav class="bottom-nav">
           <button class={`tab-btn ${activeTab === 'dashboard' ? 'active' : ''}`} onClick={() => setActiveTab('dashboard')}>
-            <svg class="nav-icon" viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg><span>稼働</span>
+            <span aria-hidden="true" className="sim-nav-icon">🛵</span><span>稼働</span>
           </button>
           <button className={`tab-btn ${activeTab === 'simulation' ? 'active' : ''}`} aria-current={activeTab==='simulation'?'page':undefined} onClick={() => setActiveTab('simulation')}><span aria-hidden="true" className="sim-nav-icon">🧮</span><span>売上管理</span></button>
           <button class={`tab-btn ${activeTab === 'memos' ? 'active' : ''}`} onClick={() => setActiveTab('memos')}>

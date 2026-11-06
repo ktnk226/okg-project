@@ -1,26 +1,38 @@
-// Daily plans use saved past records and explicitly applied current-day snapshots.
-// Live current-day records are used only for progress and remaining-work displays.
+// Daily plans hold today's goal and immediately carry today's live actuals
+// (shortfall or excess) over to the remaining working days of the period.
 function dailyCondition(p,date,key) {
   const own=p.daily?.[date]?.[key]||{};
   return {price:own.price===''||own.price===undefined?pn(p.calc[key]):pn(own.price),uph:own.uph===''||own.uph===undefined?pn(p.calc.uph):pn(own.uph),count:own.count??''};
 }
+// True once today has any entered sales, reward or delivery count.
+function dailyHasActual(vault,date) {const a=pday(vault,date);return a.total!==0||a.cnt!==0||a.u.cnt!==0||a.d.cnt!==0;}
 function dailyMinutes(u,d,conditions) {
   const uphU=pn(conditions.u.uph),uphD=pn(conditions.d.uph);
   if(u>0&&!uphU||d>0&&!uphD)return null;
   return Math.ceil((u/(uphU||1)+d/(uphD||1))*60);
 }
 function dailyTime(minutes) {return minutes===null?'UPH未設定':Math.floor(minutes/60)+'時間'+minutes%60+'分';}
-function dailyPeriod(vault,goals,p,date,cursor,range,rewardDate=cursor,afterActual=false) {
-  const saved=Object.keys(p.confirmed||{}).filter(d=>d>=cursor&&d>=range[0]&&d<=range[1]&&pdaySetting(p,goals,d).mode!=='off').sort();
+function dailyPeriod(vault,goals,p,date,cursor,range,rewardDate=cursor,release=null) {
+  // A confirmation reserves its amount only while it is current: made today,
+  // and (for later days) before any change to today's actuals. Otherwise the
+  // day absorbs the latest carry-over and keeps only its fares and UPH.
+  const seen=pday(vault,rewardDate).total;
+  const open=d=>{if(release===null)return false;const s=p.confirmed[d];return s.on!==rewardDate||d>=release&&s.seen!==seen;};
+  const confirmedDays=Object.keys(p.confirmed||{}).filter(d=>d>=cursor&&d>=range[0]&&d<=range[1]&&pdaySetting(p,goals,d).mode!=='off').sort();
+  const saved=confirmedDays.filter(d=>!open(d));
   const anchor=p.planAnchors?.[range[0]];
-  const held=anchor?.asOf===rewardDate&&(!afterActual||anchor.afterApply===true)?Object.fromEntries(Object.entries(anchor.held).filter(([d])=>d>=cursor&&pdaySetting(p,goals,d).mode!=='off')):{};
+  const held=anchor?.asOf===rewardDate?Object.fromEntries(Object.entries(anchor.held).filter(([d])=>d>=cursor&&!(release!==null&&d>=release&&anchor.seen!==seen)&&pdaySetting(p,goals,d).mode!=='off')):{};
   let effective=p;
-  if(saved.length||Object.keys(held).length){
+  if(confirmedDays.length||Object.keys(held).length){
     // A confirmation affects that day and later days only. Earlier automatic
     // days retain their baseline; all other confirmations reserve their values.
     const days={...p.days},daily={...p.daily};
     for(const [d,s] of Object.entries({...held,...Object.fromEntries(saved.map(d=>[d,p.confirmed[d]]))})){
       days[d]={mode:'amt',value:s.target};daily[d]={u:s.u,d:s.d};
+    }
+    for(const d of confirmedDays.filter(open)){
+      const s=p.confirmed[d];daily[d]={u:{...s.u,count:''},d:{...s.d,count:''}};
+      if(days[d]?.mode!=='off')days[d]={mode:'auto',value:''};
     }
     effective={...p,days,daily};
   }
@@ -79,11 +91,14 @@ function dailyPlan(vault,goals,p,date,today,includeDrafts=true) {
   const carry=split&&today>ranges[0][1]?Math.max(0,ranges[0][2]-pactual(past,ranges[0][0],ranges[0][1])):0;
   const parts=ranges.map((configured,index)=>{
     const carried=index===1?carry:0,range=[configured[0],configured[1],configured[2]+carried];
-    const original=dailyPeriod(past,goals,p,date,today,range);
+    const tomorrow=pdate(today,1);
+    const original=dailyPeriod(past,goals,p,date,today,range,today,tomorrow);
     original.configuredGoal=configured[2];original.carried=carried;original.carryOut=index===0?carry:0;
-    const snapshot=p.applied?.[today];
-    if(snapshot&&today>=range[0]&&today<=range[1]){
-      const reflected=dailyPeriod({...past,[today]:snapshot.record},goals,p,date,pdate(today,1),range,today,true);
+    // Today's goal is held; its live actuals immediately reallocate the
+    // remainder (shortfall or excess) across the later working days.
+    const live=dailyHasActual(vault,today)?vault[today]:null;
+    if(live&&today>=range[0]&&today<=range[1]){
+      const reflected=dailyPeriod({...past,[today]:live},goals,p,date,tomorrow,range,today,tomorrow);
       original.rows=original.rows.map(r=>r.date>today?reflected.rows.find(x=>x.date===r.date):r);
       original.reflected=reflected;
     }
@@ -125,27 +140,11 @@ function dailyPlan(vault,goals,p,date,today,includeDrafts=true) {
     original.liveShortfall=Math.max(0,original.w.goal-original.actual-original.pendingRewards);
     return original;
   });
-  return {parts,rows:parts.flatMap(x=>x.rows),applied:p.applied?.[today]||null};
+  return {parts,rows:parts.flatMap(x=>x.rows),applied:dailyHasActual(vault,today)?{record:vault[today]}:null};
 }
 function dailySummary(vault,goals,p,today) {
   const plan=dailyPlan(vault,goals,p,today,today,false),r=plan.rows.find(x=>x.date===today);
   return {plan,row:r,target:r.target,actual:r.actual,remain:r.remaining,over:r.over,hasGoal:pgoal(goals,today,'week')>0||r.fixed!==null,off:r.setting.mode==='off',manual:r.fixed!==null,need:r.missingPrice?null:r.remainingU+r.remainingD,time:r.missingPrice?'単価未設定':dailyTime(r.remainingMinutes),uberNeed:r.remainingQuest,reason:r.missingPrice?'不足売上を補う会社の通常単価を設定してください。':'',quotas:plan.parts.filter(part=>today>=part.w.start&&today<=part.w.end&&part.w.quests.length).map(part=>({id:part.w.start,today:r.remainingQuest,remaining:part.questRemaining,days:part.rows.filter(x=>x.eligible).length,unallocated:part.nextUnallocatedUber}))};
-}
-function dailyApply(vault,p,today,goals=null) {
-  const record=JSON.parse(JSON.stringify(vault[today]||{sets:[]}));
-  // Keep the earlier-day baseline for today's goal, while releasing future
-  // automatic days to the actual-based reallocation. A later plan confirmation
-  // may establish a new baseline for its preceding, still-open days.
-  const planAnchors=Object.fromEntries(Object.entries(p.planAnchors||{}).map(([start,a])=>[start,start<=today&&a.end>=today&&a.asOf===today?{...a,afterApply:false}:a]));
-  const end=pdate(prange(today,'week')[0],goals&&!phasSplit(goals,today)?6:new Date(today+'T12:00:00').getDay()>=1&&new Date(today+'T12:00:00').getDay()<=4?3:6);
-  const confirmed={...p.confirmed},drafts={...p.drafts},daily={...p.daily},days={...p.days};
-  for(const date of pdays(pdate(today,1),end)){
-    const saved=confirmed[date],base=daily[date]||{},pending=drafts[date]||{},conditions={u:{...base.u,...saved?.u,...pending.u},d:{...base.d,...saved?.d,...pending.d}};
-    daily[date]={...daily[date],u:{...conditions.u,count:''},d:{...conditions.d,count:''}};
-    if(days[date]?.mode!=='off')days[date]={mode:'auto',value:''};else days[date]={...days[date],resumeMode:'auto'};
-    delete confirmed[date];delete drafts[date];
-  }
-  return {...p,confirmed,drafts,daily,days,...(p.planAnchors?{planAnchors}:{}),applied:{...p.applied,[today]:{record}}};
 }
 function dailyDraftRow(row,draft) {
   const condition=c=>({...c,price:pn(c.price),uph:pn(c.uph)});
@@ -179,11 +178,11 @@ function dailyConfirm(vault,goals,p,date,today) {
   const plan=dailyPlan(vault,goals,p,date,today),part=plan.parts.find(part=>part.w.start<=date&&part.w.end>=date),r=part.rows.find(r=>r.date===date);
   if(!r?.eligible)throw Error('過去の日と休みの日は確定できません');
   if(r.u&&!r.conditions.u.price||r.d&&!r.conditions.d.price)throw Error('配達する会社の通常単価を設定してください');
-  const snapshot=dailySnapshot(r);
+  const snapshot={...dailySnapshot(r),on:today,seen:pday(vault,today).total};
   const committed=dailyPlan(vault,goals,p,date,today,false);
   const held=Object.fromEntries(committed.rows.filter(r=>r.eligible&&r.date>=part.w.start&&r.date<date).map(r=>[r.date,dailySnapshot(r)]));
   const drafts={...p.drafts};delete drafts[date];
-  return {...p,drafts,confirmed:{...p.confirmed,[date]:snapshot},planAnchors:{...p.planAnchors,[part.w.start]:{asOf:today,date,end:part.w.end,held,afterApply:!!p.applied?.[today]}}};
+  return {...p,drafts,confirmed:{...p.confirmed,[date]:snapshot},planAnchors:{...p.planAnchors,[part.w.start]:{asOf:today,date,end:part.w.end,held,afterApply:dailyHasActual(vault,today),seen:snapshot.seen}}};
 }
 function dailySnapshot(r) {return {basis:r.draft?.basis||r.confirmed?.basis||'amount',target:r.target,u:{count:r.u,price:r.conditions.u.price,uph:r.conditions.u.uph},d:{count:r.d,price:r.conditions.d.price,uph:r.conditions.d.uph}};}
 function dailyRelease(p,date) {
