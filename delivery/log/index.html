@@ -194,6 +194,7 @@
     .set-summary-row1 { font-size: 20px; font-weight: 800; color: #fff; font-family: var(--font-mono); }
     .set-summary-row2 { font-size: 14px; color: var(--muted2); font-family: var(--font-mono); display: flex; gap: 10px; flex-wrap: wrap; margin-top: 4px; }
     .set-summary-tag { background: rgba(255,255,255,0.05); padding: 4px 10px; border-radius: 6px; border: 1px solid var(--border); }
+    .set-summary-rates { display: flex; gap: 10px; }
 
     .time-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding-top: 14px; margin-bottom: 12px; }
     .time-field { display: flex; gap: 6px; }
@@ -1948,7 +1949,10 @@ function App() {
                       <div class="set-summary-row1">{s.sc} 件 / {s.sp.toLocaleString()} 円</div>
                       <div class="set-summary-row2">
                         <span class="set-summary-tag">⏱️ {durText}</span>
-                        <span class="set-summary-tag">💴 時給 {s.setJikyu > 0 ? s.setJikyu.toLocaleString() + '円' : '-'}</span>
+                        <span class="set-summary-rates">
+                          <span class="set-summary-tag">💴 時給 {s.setJikyu > 0 ? s.setJikyu.toLocaleString() + '円' : '-'}</span>
+                          <span class="set-summary-tag" data-testid="set-uph">UPH {s.dur && s.dur.total > 0 ? (s.sc / s.dur.total).toFixed(1) + '件/h' : '—'}</span>
+                        </span>
                       </div>
                     </div>
 

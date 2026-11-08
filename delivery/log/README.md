@@ -25,7 +25,14 @@ node delivery/log/confirmation.test.cjs
 node delivery/log/outlook.test.cjs
 # ローカルHTTPサーバーの公開先を指定。Chromium/Playwrightが必要。
 DELILOG_TEST_URL=http://127.0.0.1:8020/delivery/log/ node delivery/log/browser.test.cjs
+DELILOG_TEST_URL=http://127.0.0.1:8020/delivery/log/ node delivery/log/input-uph.browser.cjs
 ```
+
+`input-uph.browser.cjs`は、会社別計画件数の消去・再入力（逆方向・0件を含む）、空欄の保存・再読込とv16 JSON復元、各セットのUPHをPC/iPhone相当のChromiumで確認します。必要なら`CHROMIUM_PATH`でブラウザ実行ファイルを指定できます。
+
+件数の片方を空欄にすると、その会社だけ自動計算へ戻り、もう片方の手入力（0件を含む）を保持します。両方の件数が指定されている間は件数×単価で目標を試算し、空欄がある間は直前の目標を基準に、Uber必須件数と「不足売上を補う会社」の既存ルールで自動計算します。手入力の会社へは自動追加しません。金額を明示して逆算する操作では両社を自動計算へ戻します。
+
+稼働セットの時給の横に、同じセットの配達件数（全社の累計差分）÷時給と同じ稼働時間を小数第1位の`UPH 3.0件/h`形式で表示します。稼働時間が0または時刻未入力なら`UPH —`、時間が正で件数が0なら`UPH 0.0件/h`です。保存項目・キー・バックアップ形式の変更はありません。
 
 日別条件・実績反映スナップショットに加え、編集中の条件（drafts）、確定計画（confirmed）、当日内の再配分基準（planAnchors）を既存のplanningキー内に保存し、読み込み時に検証します。完全バックアップは既存v16形式を継続します。 前半不足の繰越額は設定目標へ保存せず、金曜以降に同じ週の保存済み実績から算出します。日別配達目標とUber必須件数を確保して、その日の不足分だけを選択会社の件数へ切り上げ換算します。計算は`daily-planning.test.cjs`、実績修正・日跨ぎ・JSON往復の画面操作は`browser.test.cjs`で検証します。
 
