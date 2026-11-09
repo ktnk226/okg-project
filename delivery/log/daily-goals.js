@@ -10,6 +10,30 @@ function dailyGoalSource(p,goals,date) {
   if(u.count!==''||d.count!=='')return {basis:'counts',target:0,u,d};
   return null;
 }
+function dailyGoalEntered(p,date,source) {
+  if(!source)return false;
+  if(source.basis==='counts')return source.u.count!==''||source.d.count!=='';
+  // A price-only draft starts at numeric 0. Explicitly typed zero is a plan;
+  // blank amounts and legacy deletion placeholders are not allocation days.
+  return source.target!==''&&(pn(source.target)>0||typeof source.target==='string'||!!p.confirmed?.[date]);
+}
+function dailyQuestAllocations(vault,goals,p,today) {
+  const days={};
+  const quests=pquestMoney(vault,p,today).map(({q,recorded})=>{
+    const amount=Math.round(pbudget(q)),claimed=Math.min(amount,Math.round(pn(recorded)));
+    const dates=pdays(q.start,q.end).filter(date=>p.days[date]?.mode!=='off'&&dailyGoalEntered(p,date,dailyGoalSource(p,goals,date)));
+    const share=(total,i)=>Math.floor(total/dates.length)+(i<total%dates.length?1:0);
+    const allocations=dates.map((date,i)=>{
+      const value=share(amount,i),recordedShare=share(claimed,i),pending=value-recordedShare;
+      const item={id:q.id,date,reward:amount,amount:value,recorded:recordedShare,pending,forecast:q.status==='n',expired:q.status==='n'&&q.end<today};
+      const day=days[date]||(days[date]={amount:0,recorded:0,pending:0,forecast:0,items:[]});
+      day.amount+=value;day.recorded+=recordedShare;day.pending+=pending;day.forecast+=item.forecast?value:0;day.items.push(item);
+      return item;
+    });
+    return {q,amount,recorded:claimed,pending:amount-claimed,dates,allocations,unallocated:dates.length?0:amount,unallocatedPending:dates.length?0:amount-claimed};
+  });
+  return {quests,days};
+}
 function dailyGoalPlan(vault,goals,p,date,today) {
   const [mon,sun]=prange(date,'week'),past=Object.fromEntries(Object.entries(vault).filter(([d])=>d<today));
   const sources={},days={...p.days},daily={...p.daily};
@@ -27,7 +51,8 @@ function dailyGoalPlan(vault,goals,p,date,today) {
       let r=s?dailyDraftRow(base,s):{...base,target:0};
       if(s?.basis==='counts')r.target=r.revenue;
       if(off)r={...r,target:0,u:0,d:0,quest:0,revenue:0,minutes:0};
-      r.draft=p.drafts?.[r.date];r.confirmed=p.confirmed?.[r.date]||null;r.hasPlan=!!s&&!off;
+      r.draft=p.drafts?.[r.date];r.confirmed=p.confirmed?.[r.date]||null;r.hasPlan=dailyGoalEntered(p,r.date,s)&&!off;
+      if(!r.hasPlan)r={...r,target:0,u:0,d:0,revenue:0,minutes:0,extraU:0,extraD:0};
       r.fixed=r.hasPlan?r.target:null;
       const a=pday(vault,r.date);r.actual=a.real;r.actualTotal=a.total;r.actualU=a.u.cnt;r.actualD=a.d.cnt;
       r.remaining=Math.max(0,r.target-r.actual);r.over=Math.max(0,r.actual-r.target);
@@ -57,27 +82,42 @@ function dailyGoalPlan(vault,goals,p,date,today) {
     part.liveShortfall=Math.max(0,goal-part.actualDelivery);part.draftPlanned=sum('revenue');
     return part;
   });
-  return {parts,rows:parts.flatMap(p=>p.rows),applied:null};
+  const allocations=dailyQuestAllocations(vault,goals,p,today);
+  for(const part of parts){
+    for(const r of part.rows){
+      const share=allocations.days[r.date];
+      r.questAllocation=share?.amount||0;r.questPendingAllocation=share?.pending||0;r.questRecordedAllocation=share?.recorded||0;r.questForecastAllocation=share?.forecast||0;r.questShares=share?.items||[];
+      r.uberDelivery=r.u*r.conditions.u.price;r.demaecanDelivery=r.d*r.conditions.d.price;
+      r.salesTarget=r.target+r.questAllocation;
+      // The comparison starts with delivery actuals, never actuals including
+      // rewards. Full daily shares therefore cannot add a recorded reward twice.
+      r.actualAtAchievement=r.actual+r.questAllocation;
+    }
+    const sum=k=>part.rows.reduce((n,r)=>n+r[k],0);
+    part.deliveryGoal=part.w.goal;part.questAllocation=sum('questAllocation');part.questPendingAllocation=sum('questPendingAllocation');part.salesGoal=sum('salesTarget');
+  }
+  return {parts,rows:parts.flatMap(p=>p.rows),questAllocations:allocations.quests.filter(x=>x.q.start<=sun&&x.q.end>=mon),applied:null};
 }
 function dailyGoalSummary(vault,goals,p,today) {
   const plan=dailyGoalPlan(vault,goals,p,today,today),r=plan.rows.find(r=>r.date===today);
-  return {plan,row:r,target:r.target,actual:r.actual,remain:r.remaining,over:r.over,hasGoal:r.hasPlan,off:r.setting.mode==='off',need:r.missingPrice?null:r.remainingU+r.remainingD,time:r.missingPrice?'単価未設定':dailyTime(r.remainingMinutes),uberNeed:r.remainingQuest,reason:r.missingPrice?'配達する会社の通常単価を設定してください。':'',quotas:plan.parts.filter(part=>today>=part.w.start&&today<=part.w.end&&part.w.quests.length).map(part=>({id:part.w.start,today:r.remainingQuest,remaining:part.questRemaining,days:part.rows.filter(x=>x.eligible).length,unallocated:part.nextUnallocatedUber}))};
+  return {plan,row:r,target:r.target,salesTarget:r.salesTarget,actual:r.actual,actualAtAchievement:r.actualAtAchievement,remain:r.remaining,over:r.over,hasGoal:r.hasPlan,off:r.setting.mode==='off',need:r.missingPrice?null:r.remainingU+r.remainingD,time:r.missingPrice?'単価未設定':dailyTime(r.remainingMinutes),uberNeed:r.remainingQuest,reason:r.missingPrice?'配達する会社の通常単価を設定してください。':'',quotas:plan.parts.filter(part=>today>=part.w.start&&today<=part.w.end&&part.w.quests.length).map(part=>({id:part.w.start,today:r.remainingQuest,remaining:part.questRemaining,days:part.rows.filter(x=>x.eligible).length,unallocated:part.nextUnallocatedUber}))};
 }
 function dailyGoalOutlook(vault,goals,p,date,today) {
   const plan=dailyGoalPlan(vault,goals,p,date,today);
-  const parts=plan.parts.map(part=>({part,goal:part.w.goal,actual:part.actual,actualDelivery:part.actualDelivery,forecastRewards:part.pendingRewards,active:part.rows.filter(r=>r.eligible),allConfirmed:part.rows.some(r=>r.eligible)&&part.rows.filter(r=>r.eligible).every(r=>r.confirmed&&!r.draft),unallocatedUber:part.nextUnallocatedUber,unallocatedDelivery:part.nextShortfall}));
+  const parts=plan.parts.map(part=>({part,goal:part.salesGoal,deliveryGoal:part.deliveryGoal,questAllocation:part.questAllocation,questPendingAllocation:part.questPendingAllocation,actual:part.actual,actualDelivery:part.actualDelivery,forecastRewards:part.pendingRewards,active:part.rows.filter(r=>r.eligible),allConfirmed:part.rows.some(r=>r.eligible)&&part.rows.filter(r=>r.eligible).every(r=>r.confirmed&&!r.draft),unallocatedUber:part.nextUnallocatedUber,unallocatedDelivery:part.nextShortfall}));
   const sum=k=>parts.reduce((n,p)=>n+p[k],0);
-  return {plan,parts,week:{goal:sum('goal'),actual:sum('actual'),actualDelivery:sum('actualDelivery'),forecastRewards:sum('forecastRewards')},today};
+  return {plan,parts,week:{goal:sum('goal'),deliveryGoal:sum('deliveryGoal'),questAllocation:sum('questAllocation'),questPendingAllocation:sum('questPendingAllocation'),actual:sum('actual'),actualDelivery:sum('actualDelivery'),forecastRewards:sum('forecastRewards')},today};
 }
 function dailyGoalConfirm(vault,goals,p,date,today) {
   const r=dailyGoalPlan(vault,goals,p,date,today).rows.find(r=>r.date===date);
   if(!r?.eligible)throw Error('過去の日と休みの日は確定できません');
+  if(!r.hasPlan)throw Error('計画件数または目標金額を入力してください');
   if(r.u&&!r.conditions.u.price||r.d&&!r.conditions.d.price)throw Error('配達する会社の通常単価を設定してください');
   const drafts={...p.drafts};delete drafts[date];
   return {...p,drafts,confirmed:{...p.confirmed,[date]:{...dailySnapshot(r),basis:dailyGoalSource(p,goals,date)?.basis||'amount',on:today,seen:pday(vault,today).total}}};
 }
 function dailyGoalDelete(p,date) {
   const next=dailyRelease(p,date),daily={...next.daily};delete daily[date];
-  // An explicit zero prevents a legacy D-date goal from resurfacing.
-  return {...next,daily,days:{...next.days,[date]:{mode:'amt',value:0}}};
+  // This empty setting shadows legacy D-date goals without becoming a plan.
+  return {...next,daily,days:{...next.days,[date]:{mode:'auto',value:''}}};
 }

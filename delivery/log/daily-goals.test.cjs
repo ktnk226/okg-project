@@ -56,9 +56,9 @@ test('past day plans stay in the week; live sales, rewards and date rollover do 
  for(const today of [mon,fri,'2026-11-08','2026-11-09'])assert.deepEqual(totals(view(p,{},v,today)),[13000,6000,19000]);
  assert.equal(JSON.stringify(p),before);
 });
-test('quest obligations and reward forecasts remain separate from the sum of daily delivery targets',()=>{
+test('quest allocation adds to the sales goal while the delivery goal stays separate',()=>{
  let p=counts(plan(),mon,'20','10');p.quests=[{id:'q',start:mon,end:'2026-11-05',count:40,base:9000,extra:1000,adjust:0,aim:'base',finish:'n',status:'n',links:[]}];
- const o=view(p);assert.deepEqual(totals(o),[13000,0,13000]);assert.equal(o.parts[0].forecastRewards,9000);assert.equal(o.plan.rows[0].u,20);
+ const o=view(p);assert.deepEqual(totals(o),[22000,0,22000]);assert.equal(o.parts[0].deliveryGoal,13000);assert.equal(o.parts[0].forecastRewards,9000);assert.equal(o.plan.rows[0].u,20);
 });
 test('legacy daily counts and money are read without migrating records; month/year and adjacent weeks stay independent',()=>{
  const p=plan();p.daily={[mon]:{u:{count:20,price:450},d:{count:10,price:500}}};
