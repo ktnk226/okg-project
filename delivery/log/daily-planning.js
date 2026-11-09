@@ -152,13 +152,18 @@ function dailySummary(vault,goals,p,today) {
 function dailyDraftRow(row,draft) {
   const condition=c=>({...c,price:pn(c.price),uph:pn(c.uph)});
   const r={...row,draft,conditions:{u:condition(draft.u),d:condition(draft.d)}};
-  if(draft.basis==='counts'){
+  if(draft.basis==='counts'&&draft.u.count!==''&&draft.d.count!==''){
     r.u=pn(draft.u.count);r.d=pn(draft.d.count);r.quest=Math.min(row.quest,r.u);
     r.target=r.u*pn(draft.u.price)+r.d*pn(draft.d.price);r.deliveryGap=0;r.salesAdded=0;
   }else{
-    r.target=draft.target===''?row.target:pn(draft.target);r.u=r.quest;r.d=0;
-    r.deliveryGap=Math.max(0,r.target-r.u*pn(draft.u.price));
-    r.salesAdded=pn(draft[r.fill].price)?Math.ceil(r.deliveryGap/pn(draft[r.fill].price)):0;r[r.fill]+=r.salesAdded;
+    // An empty count restores only that company's automatic calculation.
+    // Keep the other company's explicit count (including zero) as entered.
+    r.target=draft.target===''?row.target:pn(draft.target);
+    const manual=key=>draft.basis==='counts'&&draft[key].count!=='';
+    r.u=manual('u')?pn(draft.u.count):r.quest;r.d=manual('d')?pn(draft.d.count):0;
+    r.quest=Math.min(row.quest,r.u);
+    r.deliveryGap=Math.max(0,r.target-r.u*pn(draft.u.price)-r.d*pn(draft.d.price));
+    r.salesAdded=!manual(r.fill)&&pn(draft[r.fill].price)?Math.ceil(r.deliveryGap/pn(draft[r.fill].price)):0;r[r.fill]+=r.salesAdded;
   }
   r.revenue=r.u*pn(draft.u.price)+r.d*pn(draft.d.price);r.extraU=r.u-r.quest;r.extraD=r.d;
   r.minutes=dailyMinutes(r.u,r.d,r.conditions);r.dayShortfall=Math.max(0,r.target-r.revenue);
@@ -170,7 +175,7 @@ function dailyEdit(p,row,key,field,value) {
     draft.basis='amount';draft.target=value;draft.u.count='';draft.d.count='';
   }else{
     if(field==='count'){
-      if(value===''){draft.basis='amount';draft.target=row.target;draft.u.count='';draft.d.count='';}
+      if(value===''){draft[key].count='';draft.basis=draft[key==='u'?'d':'u'].count===''?'amount':'counts';draft.target=row.target;}
       else {if(draft.basis!=='counts'){draft.u.count=row.u;draft.d.count=row.d;}draft.basis='counts';}
     }
     draft[key][field]=value;

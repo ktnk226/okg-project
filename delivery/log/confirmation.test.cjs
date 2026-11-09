@@ -12,6 +12,27 @@ const row=(p,date,g=goals(),v={},today=fri)=>result(p,g,v,today).rows.find(r=>r.
 const targets=r=>Array.from(r.rows,x=>x.target);
 function counts(p,date,u,d,g=goals(),v={},today=fri){p=c.dailyEdit(p,row(p,date,g,v,today),'u','count',u);return c.dailyEdit(p,row(p,date,g,v,today),'d','count',d);}
 const confirm=(p,date=fri,g=goals(),v={},today=fri)=>c.dailyConfirm(v,g,p,date,today);
+test('clearing and retyping either company count preserves the other manual count, including explicit zero',()=>{
+ for(const [cleared,kept,fill] of [['d','u','d'],['u','d','u']])for(const keep of ['20','0']){
+  let p=plan();p.dailyPeriods={[fri]:{fill}};
+  p=counts(p,fri,cleared==='u'?'10':keep,cleared==='d'?'10':keep);
+  const before=JSON.stringify(p),target=row(p,fri).target;
+  p=c.dailyEdit(p,row(p,fri),cleared,'count','');
+  assert.equal(p.drafts[fri][kept].count,keep);assert.equal(p.drafts[fri][cleared].count,'');
+  assert.equal(row(p,fri)[kept],Number(keep));assert.equal(row(p,fri)[cleared],10);assert.equal(row(p,fri).target,target);
+  p=c.pvalidate(JSON.parse(JSON.stringify(p)));assert.equal(row(p,fri)[kept],Number(keep));
+  const committed=confirm(p);assert.equal(row(committed,fri)[kept],Number(keep));assert.equal(row(committed,fri)[cleared],10);
+  p=c.dailyEdit(p,row(p,fri),cleared,'count','10');assert.equal(p.drafts[fri][kept].count,keep);assert.equal(row(p,fri)[kept],Number(keep));
+  p=c.dailyEdit(p,row(p,fri),cleared,'count','0');assert.equal(row(p,fri)[cleared],0);assert.equal(row(p,fri)[kept],Number(keep));
+  p=confirm(p);assert.equal(row(p,fri)[kept],Number(keep));assert.equal(row(p,fri)[cleared],0);
+  assert.equal(JSON.parse(before).drafts[fri][cleared].count,'10');
+ }
+});
+test('both empty counts return to automatic amount calculation; explicit amount edit still resets both',()=>{
+ let p=counts(plan(),fri,'20','10');p=c.dailyEdit(p,row(p,fri),'d','count','');p=c.dailyEdit(p,row(p,fri),'u','count','');
+ assert.equal(p.drafts[fri].basis,'amount');assert.equal(p.drafts[fri].u.count,'');assert.equal(p.drafts[fri].d.count,'');assert.equal(row(p,fri).d,26);
+ p=counts(p,fri,'20','10');p=c.dailyEdit(p,row(p,fri),'target',null,'15000');assert.equal(row(p,fri).u,0);assert.equal(row(p,fri).d,30);
+});
 test('45×400=18,000 draft with no automatic fill or feedback; only confirmation changes future and the work screen',()=>{
  let p=counts(plan(),fri,45,0);let r=result(p);assert.deepEqual(targets(r),[18000,15000,15000]);assert.equal(r.rows[0].minutes,844);assert.equal(r.draftPlanned,48000);assert.equal(c.dailySummary({},goals(),p,fri).target,15000);
  const before=JSON.stringify(p);for(let i=0;i<20;i++)assert.deepEqual(targets(result(p)),[18000,15000,15000]);assert.equal(JSON.stringify(p),before);
