@@ -34,9 +34,8 @@ function dailyQuestAllocations(vault,goals,p,today) {
   });
   return {quests,days};
 }
-function dailyActualComplete(vault,date,today) {return date<today||(date<=today&&vault[date]?.actualConfirmed===true);}
 function dailyGoalPlan(vault,goals,p,date,today) {
-  const [mon,sun]=prange(date,'week'),past=Object.fromEntries(Object.entries(vault).filter(([d])=>dailyActualComplete(vault,d,today)));
+  const [mon,sun]=prange(date,'week'),past=Object.fromEntries(Object.entries(vault).filter(([d])=>d<today));
   const sources={},days={...p.days},daily={...p.daily};
   for(const d of pdays(mon,sun)){
     const s=dailyGoalSource(p,goals,d);sources[d]=s;
@@ -46,7 +45,7 @@ function dailyGoalPlan(vault,goals,p,date,today) {
   }
   const effective={...p,days,daily,confirmed:{},planAnchors:{}};
   const parts=[[mon,pdate(mon,3)],[pdate(mon,4),sun]].map(([start,end])=>{
-    const part=dailyPeriod(past,{},effective,date,dailyActualComplete(vault,today,today)?pdate(today,1):today,[start,end,0],today);
+    const part=dailyPeriod(past,{},effective,date,today,[start,end,0],today);
     part.rows=part.rows.map(base=>{
       const s=sources[base.date],off=base.setting.mode==='off';
       let r=s?dailyDraftRow(base,s):{...base,target:0};
@@ -85,7 +84,6 @@ function dailyGoalPlan(vault,goals,p,date,today) {
   });
   const allocations=dailyQuestAllocations(vault,goals,p,today);
   for(const part of parts){
-    dailyApplyAutomaticTargets(part,vault,p,today);
     for(const r of part.rows){
       const share=allocations.days[r.date];
       r.questAllocation=share?.amount||0;r.questPendingAllocation=share?.pending||0;r.questRecordedAllocation=share?.recorded||0;r.questForecastAllocation=share?.forecast||0;r.questShares=share?.items||[];
@@ -96,11 +94,7 @@ function dailyGoalPlan(vault,goals,p,date,today) {
       r.actualAtAchievement=r.actual+r.questAllocation;
     }
     const sum=k=>part.rows.reduce((n,r)=>n+r[k],0);
-    part.goalHeld=p.periodTargets?.[part.w.start]!==undefined||part.autoTargets;
-    part.plannedDelivery=part.rows.reduce((n,r)=>n+(dailyActualComplete(vault,r.date,today)?r.actual:Math.max(r.actual,r.hasPlan?r.target:0)),0);
-    part.planGap=part.deliveryGoal-part.plannedDelivery;
-    part.w={...part.w,goal:part.deliveryGoal};
-    part.questAllocation=sum('questAllocation');part.questPendingAllocation=sum('questPendingAllocation');part.salesGoal=part.deliveryGoal+part.questAllocation;
+    part.deliveryGoal=part.w.goal;part.questAllocation=sum('questAllocation');part.questPendingAllocation=sum('questPendingAllocation');part.salesGoal=sum('salesTarget');
   }
   return {parts,rows:parts.flatMap(p=>p.rows),questAllocations:allocations.quests.filter(x=>x.q.start<=sun&&x.q.end>=mon),applied:null};
 }
@@ -115,85 +109,15 @@ function dailyGoalOutlook(vault,goals,p,date,today) {
   return {plan,parts,week:{goal:sum('goal'),deliveryGoal:sum('deliveryGoal'),questAllocation:sum('questAllocation'),questPendingAllocation:sum('questPendingAllocation'),actual:sum('actual'),actualDelivery:sum('actualDelivery'),forecastRewards:sum('forecastRewards')},today};
 }
 function dailyGoalConfirm(vault,goals,p,date,today) {
-  const plan=dailyGoalPlan(vault,goals,p,date,today),part=plan.parts.find(x=>date>=x.w.start&&date<=x.w.end);
-  const r=plan.rows.find(r=>r.date===date);
-  if(part.autoTargets)p=dailySetPeriodTarget(p,part.w.start,part.deliveryGoal);
+  const r=dailyGoalPlan(vault,goals,p,date,today).rows.find(r=>r.date===date);
   if(!r||r.setting.mode==='off')throw Error('休みの日は確定できません');
   if(!r.hasPlan)throw Error('計画件数または目標金額を入力してください');
   if(r.u&&!r.conditions.u.price||r.d&&!r.conditions.d.price)throw Error('配達する会社の通常単価を設定してください');
   const drafts={...p.drafts};delete drafts[date];
-  return {...p,drafts,confirmed:{...p.confirmed,[date]:{...dailySnapshot(r),basis:r.autoTarget?'amount':dailyGoalSource(p,goals,date)?.basis||'amount',on:today,seen:pday(vault,today).total}}};
+  return {...p,drafts,confirmed:{...p.confirmed,[date]:{...dailySnapshot(r),basis:dailyGoalSource(p,goals,date)?.basis||'amount',on:today,seen:pday(vault,today).total}}};
 }
 function dailyGoalDelete(p,date) {
   const next=dailyRelease(p,date),daily={...next.daily};delete daily[date];
   // This empty setting shadows legacy D-date goals without becoming a plan.
   return {...next,daily,days:{...next.days,[date]:{mode:'auto',value:''}}};
-}
-
-// Freeze the pre-edit period budget when replanning an already-started period.
-// Read-only calculations never migrate or rewrite stored plans or actuals.
-function dailyPreservePeriodTargets(vault,goals,before,next,today) {
-  const targets={...next.periodTargets};let changed=false;
-  const dates=new Set(['days','daily','drafts','confirmed'].flatMap(k=>[...Object.keys(before[k]||{}),...Object.keys(next[k]||{})].filter(d=>JSON.stringify(before[k]?.[d])!==JSON.stringify(next[k]?.[d]))));
-  const starts=new Set();
-  for(const date of dates){
-    const period=dailyGoalPlan(vault,goals,before,date,today).parts.find(x=>date>=x.w.start&&date<=x.w.end);
-    if(starts.has(period.w.start))continue;starts.add(period.w.start);
-    if(targets[period.w.start]===undefined&&period.rows.some(r=>dailyActualComplete(vault,r.date,today)&&r.hasPlan&&(r.confirmed||!r.draft))){
-      targets[period.w.start]=period.deliveryGoal;changed=true;
-    }
-  }
-  return changed?{...next,periodTargets:targets}:next;
-}
-function dailySetPeriodTarget(p,start,value) {
-  return {...p,periodTargets:{...p.periodTargets,[start]:Number(value)}};
-}
-function dailyRebalanceRemaining(vault,goals,p,start,today) {
-  const part=dailyGoalPlan(vault,goals,p,start,today).parts.find(x=>x.w.start===start);
-  const rows=part.rows.filter(r=>r.eligible&&r.hasPlan);
-  if(!rows.length)return p;
-  let next=dailySetPeriodTarget(p,start,part.deliveryGoal);
-  // Today's entered sales are a floor, not a completed day: only the remainder
-  // above that floor is distributed, so live sales are never subtracted twice.
-  const floors=rows.map(r=>Math.max(0,Math.ceil(r.actual)));
-  const otherActual=part.rows.filter(r=>r.date>=today&&!rows.includes(r)).reduce((n,r)=>n+r.actual,0);
-  const spare=Math.max(0,Math.round(part.deliveryGoal-part.pastDelivery-otherActual)-floors.reduce((n,x)=>n+x,0));
-  rows.forEach((r,i)=>{next=dailyEdit(next,r,'target',null,String(floors[i]+Math.floor(spare/rows.length)+(i<spare%rows.length?1:0)));});
-  return next;
-}
-
-// A finished working day consumes its actual, not its original plan.
-// Derive new targets without writing them back into the baseline plans.
-function dailyApplyAutomaticTargets(part,vault,p,today) {
-  part.inputDeliveryGoal=part.w.goal;
-  part.deliveryGoal=p.periodTargets?.[part.w.start]??part.inputDeliveryGoal;
-  const done=r=>dailyActualComplete(vault,r.date,today);
-  const completed=part.rows.filter(done),receivers=part.rows.filter(r=>!done(r)&&r.eligible&&r.hasPlan);
-  part.autoTargets=completed.some(r=>r.hasPlan||dailyHasActual(vault,r.date));
-  part.pastDelivery=completed.reduce((n,r)=>n+r.actual,0);
-  const outside=part.rows.filter(r=>!done(r)&&!receivers.includes(r)).reduce((n,r)=>n+r.actual,0);
-  part.remainingDeliveryBudget=Math.max(0,part.deliveryGoal-part.pastDelivery-outside);
-  part.remainingWorkDays=receivers.length;
-  part.completedWorkDays=completed.filter(r=>r.hasPlan||dailyHasActual(vault,r.date)).length;
-  if(!part.autoTargets)return;
-  const amount=Math.round(part.remainingDeliveryBudget);
-  for(let i=0;i<receivers.length;i++){
-    const r=receivers[i],target=Math.floor(amount/receivers.length)+(i<amount%receivers.length?1:0);
-    const derived=dailyDraftRow(r,{basis:'amount',target,u:{...r.conditions.u,count:''},d:{...r.conditions.d,count:''}});
-    const draft=r.draft;
-    Object.assign(r,derived,{draft,originalTarget:r.target,autoTarget:true,target});
-    r.remaining=Math.max(0,target-r.actual);r.over=Math.max(0,r.actual-target);
-    r.planRemainingU=Math.max(0,r.u-r.actualU);r.planRemainingD=Math.max(0,r.d-r.actualD);
-    r.remainingU=r.remainingQuest;r.remainingD=0;
-    let uncovered=Math.max(0,r.remaining-r.remainingU*r.conditions.u.price);
-    for(const key of [r.fill==='u'?'d':'u',r.fill]){
-      const price=r.conditions[key].price,field=key==='u'?'remainingU':'remainingD';
-      const available=Math.max(0,(key==='u'?r.planRemainingU:r.planRemainingD)-r[field]);
-      if(price&&uncovered){const n=Math.min(available,Math.ceil(uncovered/price));r[field]+=n;uncovered=Math.max(0,uncovered-n*price);}
-    }
-    if(uncovered&&r.conditions[r.fill].price)r[r.fill==='u'?'remainingU':'remainingD']+=Math.ceil(uncovered/r.conditions[r.fill].price);
-    r.missingPrice=(r.remainingU>0&&!r.conditions.u.price)||(r.remainingD>0&&!r.conditions.d.price)||(uncovered>0&&!r.conditions[r.fill].price);
-    r.remainingMinutes=dailyMinutes(r.remainingU,r.remainingD,r.conditions);
-  }
-  part.nextShortfall=receivers.length?0:part.remainingDeliveryBudget;
 }
