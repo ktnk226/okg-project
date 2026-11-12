@@ -201,6 +201,7 @@ function dailyValidate(p) {
   const obj=v=>v&&typeof v==='object'&&!Array.isArray(v);
   const date=d=>/^\d{4}-\d{2}-\d{2}$/.test(d)&&pdate(d)===d;
   for(const name of ['daily','dailyPeriods','applied','drafts','confirmed','planAnchors'])if(p[name]!==undefined&&!obj(p[name]))throw Error('日別計画の形式が不正です');
+  if(p.periodTargets!==undefined&&(!obj(p.periodTargets)||Object.entries(p.periodTargets).some(([d,n])=>!date(d)||![1,5].includes(new Date(d+'T12:00:00').getDay())||typeof n!=='number'||!Number.isFinite(n)||n<0)))throw Error('期間の配達目標が不正です');
   const snapshots=[p.drafts||{},p.confirmed||{}];
   for(const [start,a] of Object.entries(p.planAnchors||{})){
     if(!date(start)||!obj(a)||!date(a.asOf)||!date(a.date)||!date(a.end)||a.end<start||pdays(start,a.end).length>7||a.date<start||a.date>a.end||a.date<a.asOf||typeof a.afterApply!=='boolean'||!obj(a.held)||Object.keys(a.held).some(d=>d<start||d>=a.date||d<a.asOf))throw Error('計画再配分の形式が不正です');snapshots.push(a.held);
