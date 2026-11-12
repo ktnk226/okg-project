@@ -12,13 +12,13 @@ test('remaining-day correction holds 40000: 24000 past + 16000 Thu, no duplicate
 });
 test('rebalance preserves history and budget, actual corrections recompute remaining without mutation',()=>{
  let p=setup(),v=vault();const history=JSON.stringify(p.confirmed);p=c.dailyRebalanceRemaining(v,{},p,mon,thu);assert.equal(view(p).plan.rows[3].target,16000);assert.equal(JSON.stringify(p.confirmed),history);assert.equal(view(p).parts[0].goal,40000);
- v[mon]=actual(9000);assert.equal(view(p,v).parts[0].part.remainingDeliveryBudget,15000);assert.equal(view(p,v).parts[0].part.planGap,-1000);p=c.dailyRebalanceRemaining(v,{},p,mon,thu);assert.equal(view(p,v).plan.rows[3].target,15000);
+ v[mon]=actual(9000);assert.equal(view(p,v).parts[0].part.remainingDeliveryBudget,15000);assert.equal(view(p,v).parts[0].part.planGap,0);p=c.dailyRebalanceRemaining(v,{},p,mon,thu);assert.equal(view(p,v).plan.rows[3].target,15000);
 });
 test('today actual is a floor, not subtracted from day-total target twice',()=>{
  let p=setup(),v=vault();v[thu]=actual(5000);p=c.dailyRebalanceRemaining(v,{},p,mon,thu);const r=view(p,v).plan.rows[3];assert.equal(r.target,16000);assert.equal(r.remaining,11000);assert.equal(view(p,v).parts[0].part.planGap,0);
 });
 test('excess past sales and day sales never create negative targets or hide excess',()=>{
- let p=setup(),v=Object.fromEntries(dates.slice(0,3).map(d=>[d,actual(15000)]));v[thu]=actual(5000);p=c.dailyRebalanceRemaining(v,{},p,mon,thu);assert.equal(view(p,v).parts[0].goal,40000);assert.equal(view(p,v).plan.rows[3].target,5000);assert.equal(view(p,v).parts[0].part.planGap,-10000);
+ let p=setup(),v=Object.fromEntries(dates.slice(0,3).map(d=>[d,actual(15000)]));v[thu]=actual(5000);p=c.dailyRebalanceRemaining(v,{},p,mon,thu);assert.equal(view(p,v).parts[0].goal,40000);assert.equal(view(p,v).plan.rows[3].target,0);assert.equal(view(p,v).parts[0].part.planGap,-10000);
 });
 test('holiday/deletion preserves budget; no receivers leaves visible shortfall without inventing plans',()=>{
  for(const remove of [p=>({...p,days:{...p.days,[thu]:{mode:'off',value:''}}}),p=>c.dailyGoalDelete(p,thu)]){
