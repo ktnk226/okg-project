@@ -19,5 +19,6 @@ test('past daily plans can still be edited and confirmed without independent tar
 });
 test('removed independent goal and equal distribution controls are absent',()=>{
  const html=fs.readFileSync(__dirname+'/index.html','utf8');
- for(const marker of ['period-delivery-goal','rebalance-remaining','confirm-day-actual','dailySetPeriodTarget','dailyPreservePeriodTargets'])assert.equal(html.includes(marker),false,marker);
+ for(const marker of ['period-delivery-goal','rebalance-remaining','dailySetPeriodTarget','dailyPreservePeriodTargets'])assert.equal(html.includes(marker),false,marker);
+ assert.match(html,/data-testid="confirm-day-actual"/);
 });

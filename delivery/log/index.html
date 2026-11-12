@@ -728,7 +728,7 @@
 <script src="./simulation-core.js?v=24"></script>
 <script src="./daily-planning.js?v=28"></script>
 <script src="./simulation-outlook.js?v=26"></script>
-<script src="./daily-goals.js?v=5"></script>
+<script src="./daily-goals.js?v=6"></script>
 <script type="text/babel">
 const { useState, useMemo, useEffect, useCallback } = React;
 
@@ -1079,20 +1079,15 @@ function SimProgress({actual,goal,forecast=0,label='売上の進捗'}) {
   </div>;
 }
 function SimulationTotalCard({title,data,id}) {
-  // Only three money figures: goal, recorded sales, and what is still needed.
   const yen=n=>Math.round(n).toLocaleString()+'円';
-  const left=data.goal-data.actual;
-  return <section className="card simulation-total" data-testid={'outlook-'+id} aria-label={title+'の目標と売上'}>
+  return <section className="card simulation-total" data-testid={'outlook-'+id} aria-label={title+'の売上計画と着地見込み'}>
     <h3>{title}</h3>
     <dl className="money-list">
-      <div><dt>目標</dt><dd data-testid={id==='back'?'back-effective-goal':id+'-goal'}>{yen(data.goal)}</dd></div>
-      <div><dt>売上</dt><dd data-testid={id+'-actual'}>{yen(data.actual)}</dd></div>
-      <div className={left<0?'is-over':'is-left'}><dt>{left<0?'超過':'あと'}</dt><dd data-testid={id+'-left'}>{yen(Math.abs(left))}</dd></div>
+      <div><dt>計画合計（クエスト達成時）</dt><dd data-testid={id==='back'?'back-effective-goal':id+'-goal'}>{yen(data.goal)}</dd></div>
+      <div><dt>記録済み売上</dt><dd data-testid={id+'-actual'}>{yen(data.actual)}</dd></div>
+      <div><dt>着地見込み</dt><dd data-testid={id+'-landing'}>{yen(data.landing)}</dd></div>
     </dl>
-    {data.carried>0&&id==='back'&&<p className="sim-note">目標は設定 <span data-testid="back-configured-goal">{yen(data.configuredGoal)}</span> ＋ 前半の不足 <span data-testid="front-carryover">{yen(data.carried)}</span></p>}
-    <p className="sim-note">目標はクエスト達成時の日別目標の合計です。売上は記録済みの配達売上・報酬です。</p>
-    <p className="sim-note">配達目標 {yen(data.deliveryGoal)} ＋ クエスト配分 {yen(data.questAllocation)}</p>
-    <SimProgress actual={data.actual} goal={data.goal} label={title+'の売上'}/>
+    <p className="sim-note">配達計画 {yen(data.deliveryGoal)} ＋ クエスト配分 {yen(data.questAllocation)}</p>
   </section>;
 }
 function questShareLabel(row) {
@@ -1101,15 +1096,15 @@ function questShareLabel(row) {
 }
 function DailySalesTarget({row,compact=false}) {
   const yen=n=>Math.round(n).toLocaleString()+'円';
-  return <section className="daily-sales-target" aria-label="クエストを含む日別目標">
+  return <section className="daily-sales-target" aria-label="クエストを含む日別計画">
     {!compact&&<dl className="outlook-breakdown">
       <div><dt>Uber Eatsの配達売上</dt><dd data-testid="day-uber-delivery">{yen(row.uberDelivery)}</dd></div>
       <div><dt>出前館の配達売上</dt><dd data-testid="day-demaecan-delivery">{yen(row.demaecanDelivery)}</dd></div>
       <div><dt>Uber Eatsのクエスト配分額<br/><span className="day-badge">{questShareLabel(row)}</span></dt><dd data-testid="day-quest-allocation">{yen(row.questAllocation)}</dd></div>
     </dl>}
-    {!compact&&row.target!==row.revenue&&<p className="sim-note">配達目標は直接指定した{yen(row.target)}を使います（件数による想定配達売上は{yen(row.revenue)}）。</p>}
-    <div className="daily-sales-total"><h4>日別売上目標（クエスト達成時）</h4><strong data-testid={compact?'home-sales-target':'day-sales-target'}>{row.setting.mode==='off'?'休み':row.hasPlan?yen(row.salesTarget):'未設定'}</strong></div>
-    {compact&&<p className="sim-note">配達目標 {yen(row.target)} ＋ クエスト配分 {yen(row.questAllocation)} <span className="day-badge">{questShareLabel(row)}</span></p>}
+    {!compact&&row.target!==row.revenue&&<p className="sim-note">配達計画は直接指定した{yen(row.target)}を使います（件数による想定配達売上は{yen(row.revenue)}）。</p>}
+    <div className="daily-sales-total"><h4>日別売上計画（クエスト達成時）</h4><strong data-testid={compact?'home-sales-target':'day-sales-target'}>{row.setting.mode==='off'?'休み':row.hasPlan?yen(row.salesTarget):'未設定'}</strong></div>
+    {compact&&<p className="sim-note">配達計画 {yen(row.target)} ＋ クエスト配分 {yen(row.questAllocation)} <span className="day-badge">{questShareLabel(row)}</span></p>}
   </section>;
 }
 function DailyPlanningEditor({outlook,vault,goals,p,today,onChange,onActualDate}) {
@@ -1125,49 +1120,51 @@ function DailyPlanningEditor({outlook,vault,goals,p,today,onChange,onActualDate}
   useEffect(()=>{if(!moveFocus.current)return;moveFocus.current=false;requestAnimationFrame(()=>{const node=editorRef.current||overviewRef.current;node?.scrollIntoView({block:'start',behavior:'smooth'});node?.focus({preventScroll:true});});},[selectedDate,partIndex]);
   const selectDay=date=>{moveFocus.current=true;setSelectedDate(date);};
   const selectPart=i=>{moveFocus.current=true;setPartIndex(i);setSelectedDate(initialDay(i));setMessage('');};
+  const nextPlanDate=date=>part.rows.find(r=>r.date>date&&r.eligible&&!r.confirmed)?.date||'';
   const edit=(r,key,field,value)=>onChange(dailyEdit(p,r,key,field,value));
   const confirm=()=>{
     try{
       const next=dailyGoalConfirm(vault,goals,p,row.date,today);if(onChange(next)===false)return;
-      const nextDate=part.rows.find(r=>r.date>row.date&&r.eligible&&!next.confirmed?.[r.date])?.date||'';
-      setMessage(row.date+'の計画を確定しました。'+(nextDate?nextDate+'の設定へ進みました。':'この日より後の未確定稼働日はありません。期間合計と残りを確認してください。'));
-      selectDay(nextDate);
+      const nextDate=nextPlanDate(row.date);
+      setMessage(row.date+'の計画を確定しました。'+(nextDate?nextDate+'の設定へ進みました。':'このまま同じ日の計画を編集できます。'));
+      if(nextDate)selectDay(nextDate);
     }catch(e){setMessage(e.message);}
   };
   const input=(r,key,field,label,placeholder,step=1)=>{
     const own=p.drafts?.[r.date]?.[key]||p.confirmed?.[r.date]?.[key]||p.daily?.[r.date]?.[key]||{};
     return <label>{field==='count'?'計画件数':field==='price'?'単価（円）':'UPH'}<input aria-label={`${r.date} ${key==='u'?'Uber':'出前館'} ${label}`} type="number" inputMode="decimal" min="0" step={step} value={own[field]??''} placeholder={String(placeholder)} onChange={e=>{if(e.target.validity.valid)edit(r,key,field,e.target.value);}}/></label>;
   };
-  const badges=(r,editing=false)=><span className="day-badges">{r.date===today&&<span className="day-badge">今日</span>}{editing&&<span className="day-badge editing">編集中</span>}<span className={'day-badge '+(r.confirmed?'confirmed':'')}>{r.confirmed?'確定済み':'未確定'}</span>{r.draft&&<span className="day-badge">変更あり・目標反映済み</span>}{r.setting.mode==='off'&&<span className="day-badge">休み</span>}</span>;
+  const badges=(r,editing=false)=><span className="day-badges">{r.date===today&&<span className="day-badge">今日</span>}{editing&&<span className="day-badge editing">編集中</span>}<span className={'day-badge '+(r.confirmed?'confirmed':'')}>{r.confirmed?'確定済み':'未確定'}</span>{r.draft&&<span className="day-badge">変更あり・集計に反映済み</span>}{r.setting.mode==='off'&&<span className="day-badge">休み</span>}</span>;
   const names=parts.length===1?['選択週']:['週前半（月〜木）','週後半（金〜日）'];
   return <div className="daily-editor">
+    <p className="sim-note">着地見込みは、終了した日の実績と、これからの配達計画、クエスト報酬の見込みを集計します。</p>
     <div className="outlook-grid">
-      <SimulationTotalCard title="週売上目標" data={outlook.week} id="week"/>
+      <SimulationTotalCard title="週合計" data={outlook.week} id="week"/>
       {parts.length>1&&parts.map((x,i)=><SimulationTotalCard key={x.part.w.start} title={names[i]} data={x} id={i===0?'front':'back'}/>)}
     </div>
     {plan.questAllocations.length>0&&<section className="card" aria-label="クエスト報酬の日別配分"><h3>Uber Eatsクエストの日別配分</h3><p className="sim-note">対象期間内の、日別計画を入れた稼働日に均等配分します。1円の余りは日付順に配分します。</p>{plan.questAllocations.map(x=><div key={x.q.id}><p>{x.q.start.slice(5)}〜{x.q.end.slice(5)}：報酬 {yen(x.amount)} ／ 配分先 {x.dates.length}日 <span className="day-badge">{x.q.status==='n'?'見込み（達成時）':x.q.status==='miss'?'未達':'達成確認済み'}</span></p>{x.unallocated>0&&<p className="sim-warning" data-testid={'quest-unallocated-'+x.q.id}>未配分 {yen(x.unallocated)}：対象期間に日別計画を入れた稼働日がありません。</p>}</div>)}</section>}
     <div className="period-picker" role="group" aria-label="日別設定する期間">{parts.map((x,i)=><button key={x.part.w.start} aria-pressed={i===partIndex} onClick={()=>selectPart(i)}>{names[i]}<small>{x.part.w.start.slice(5)}〜{x.part.w.end.slice(5)}</small></button>)}</div>
     <section className="card period-workspace" data-testid={'daily-period-'+part.w.start}>
-      <h3 ref={overviewRef} tabIndex="-1" className="editor-scroll-anchor">{names[partIndex]}の残りと日別設定</h3>
+      <h3 ref={overviewRef} tabIndex="-1" className="editor-scroll-anchor">{names[partIndex]}の日別計画</h3>
       <h4 className="workspace-label">日別一覧</h4>
-      <div className="daily-choice-list">{part.rows.map(r=>{const diff=r.baseTarget===undefined?0:r.target-r.baseTarget;return r.date<today?<div className="past-day-choice" key={r.date}><span>{r.date.slice(5).replace('-','/')}　売上 {yen(r.actualTotal)}</span><button className="sim-text-button" data-testid={'past-plan-'+r.date} onClick={()=>selectDay(r.date)}>計画を確認・修正</button><button className="sim-text-button" onClick={()=>onActualDate(r.date)}>実績を確認・修正 →</button></div>:<button key={r.date} className="daily-choice" data-testid={'day-choice-'+r.date} aria-label={r.date+'の計画を編集'} aria-current={r.date===selectedDate?'true':'false'} onClick={()=>selectDay(r.date)}><span className="choice-date">{r.date.slice(5).replace('-','/')}</span><span className="choice-money">{r.setting.mode==='off'?<strong data-testid={'day-choice-target-'+r.date}>休み</strong>:<><span>目標（達成時） <strong data-testid={'day-choice-target-'+r.date}>{yen(r.salesTarget)}</strong></span>{r.date===today&&<><span>配達売上 <strong>{yen(r.actual)}</strong></span><span>{r.over>0?'配達の超過':'配達であと'} <strong>{yen(r.over>0?r.over:r.remaining)}</strong></span></>}{diff!==0&&<span className={'choice-carry '+(diff>0?'carry-up':'carry-down')} data-testid={'day-choice-carry-'+r.date}>今日の{diff>0?'不足':'超過'} {diff>0?'＋':'−'}{yen(Math.abs(diff))}</span>}</>}</span><span className="choice-counts">Uber {r.u}件 · 出前館 {r.d}件</span>{badges(r,r.date===selectedDate)}</button>;})}</div>
-      {(()=>{const future=part.rows.filter(r=>r.date>today&&r.eligible);return future.length?<p className="daily-sum" data-testid="future-target-sum">明日以降の目標合計 <strong>{yen(future.reduce((n,r)=>n+r.salesTarget,0))}</strong>（クエスト達成時）</p>:null;})()}
+      <div className="daily-choice-list">{part.rows.map(r=>{const diff=r.baseTarget===undefined?0:r.target-r.baseTarget;return r.date<today?<div className="past-day-choice" key={r.date}><span>{r.date.slice(5).replace('-','/')}　売上 {yen(r.actualTotal)}</span><button className="sim-text-button" data-testid={'past-plan-'+r.date} onClick={()=>selectDay(r.date)}>計画を確認・修正</button><button className="sim-text-button" onClick={()=>onActualDate(r.date)}>実績を確認・修正 →</button></div>:<button key={r.date} className="daily-choice" data-testid={'day-choice-'+r.date} aria-label={r.date+'の計画を編集'} aria-current={r.date===selectedDate?'true':'false'} onClick={()=>selectDay(r.date)}><span className="choice-date">{r.date.slice(5).replace('-','/')}</span><span className="choice-money">{r.setting.mode==='off'?<strong data-testid={'day-choice-target-'+r.date}>休み</strong>:<><span>計画（達成時） <strong data-testid={'day-choice-target-'+r.date}>{yen(r.salesTarget)}</strong></span>{r.date===today&&<><span>配達売上 <strong>{yen(r.actual)}</strong></span><span>{r.over>0?'配達の超過':'配達であと'} <strong>{yen(r.over>0?r.over:r.remaining)}</strong></span></>}{diff!==0&&<span className={'choice-carry '+(diff>0?'carry-up':'carry-down')} data-testid={'day-choice-carry-'+r.date}>今日の{diff>0?'不足':'超過'} {diff>0?'＋':'−'}{yen(Math.abs(diff))}</span>}</>}</span><span className="choice-counts">Uber {r.u}件 · 出前館 {r.d}件</span>{badges(r,r.date===selectedDate)}</button>;})}</div>
+      {(()=>{const future=part.rows.filter(r=>r.date>today&&r.eligible);return future.length?<p className="daily-sum" data-testid="future-target-sum">明日以降の計画合計 <strong>{yen(future.reduce((n,r)=>n+r.salesTarget,0))}</strong>（クエスト達成時）</p>:null;})()}
       {message&&<p role="status" className="sim-live">{message}</p>}
-      {!row&&<div className="period-completion" data-testid="period-completion"><h4>{period.allConfirmed?(part.reflected?'今後の計画はすべて確定済みです':'期間内の全稼働日が確定済みです'):period.active.length?'日別一覧から編集する日を選んでください':part.reflected?'翌日以降の配分先はありません':'この期間に残りの稼働日はありません'}</h4>{(period.unallocatedUber>0||period.unallocatedDelivery>0)&&<p className="sim-warning">配分できる稼働日がありません：Uber {period.unallocatedUber}件 ／ 配達 {yen(period.unallocatedDelivery)}</p>}<p className="sim-note">確定済みの日も一覧から選んで編集・再確定できます。</p></div>}
+      {!row&&<p className="sim-note" data-testid="period-completion">日別一覧から編集する日を選んでください。</p>}
       {row&&<article className="day-editor" data-testid={'allocation-'+row.date}>
         <h3 ref={editorRef} tabIndex="-1" className="editor-scroll-anchor" id="selected-day-heading">{row.date.slice(5)}の計画を編集</h3>{badges(row,true)}
         <div className="editor-toolbar">
-        <div className="editor-goal-live" aria-live="polite"><span>日別売上目標（クエスト達成時）</span><strong data-testid="editing-sales-target">{row.setting.mode==='off'?'休み':row.hasPlan?yen(row.salesTarget):'未設定'}</strong></div>
-        {row.setting.mode!=='off'&&<div className="editor-actions"><button className="gen-btn" data-testid="confirm-plan" onClick={confirm}>計画を確定して次の日へ</button><small>{row.draft?'編集中 · 目標には反映済みです':row.confirmed?'確定済み · 編集・再確定できます':'未確定 · 日別計画から目標を集計します'}</small></div>}
+        <div className="editor-goal-live" aria-live="polite"><span>日別売上計画（クエスト達成時）</span><strong data-testid="editing-sales-target">{row.setting.mode==='off'?'休み':row.hasPlan?yen(row.salesTarget):'未設定'}</strong></div>
+        {row.setting.mode!=='off'&&<div className="editor-actions"><button className="gen-btn" data-testid="confirm-plan" onClick={confirm}>{nextPlanDate(row.date)?'計画を確定して次の日へ':'この日の計画を確定'}</button><small>{row.draft?'編集中 · 集計に反映済みです':row.confirmed?'確定済み · 編集・再確定できます':'未確定 · 日別計画から合計を集計します'}</small></div>}
         </div>
-        <div className="editor-target"><span>この日の目標（配達分）</span><strong data-testid="day-target">{row.setting.mode==='off'?'休み':yen(row.target)}</strong><span>計画時間 {dailyTime(row.minutes)}</span></div>
+        <div className="editor-target"><span>この日の計画（配達分）</span><strong data-testid="day-target">{row.setting.mode==='off'?'休み':yen(row.target)}</strong><span>計画時間 {dailyTime(row.minutes)}</span></div>
         <DailySalesTarget row={row}/>
         <label>稼働予定<select aria-label={row.date+'の稼働予定'} value={row.setting.mode==='off'?'off':'auto'} onChange={e=>{const s=pdaySetting(p,goals,row.date);onChange({...p,days:{...p.days,[row.date]:e.target.value==='off'?{...s,mode:'off',resumeMode:s.mode}:{...s,mode:s.resumeMode||'auto'}}});}}><option value="auto">稼働する</option><option value="off">休み</option></select></label>
         {row.setting.mode!=='off'&&<>
           {['u','d'].map(key=><div className="editor-company" key={key}><h4>{key==='u'?'Uber Eats':'出前館'}</h4><div className="company-inputs">{input(row,key,'count','計画件数（空欄で自動）',row[key])}{input(row,key,'price','通常単価（円）',row.conditions[key].price,'any')}{input(row,key,'uph','UPH（件/時）',row.conditions[key].uph,'0.1')}</div><p className="company-plan">想定売上 {yen(row[key]*row.conditions[key].price)}{key==='u'&&<span data-testid="day-quest"> ／ 必須 {row.quest}件 ＋ 追加 {row.extraU}件</span>}</p></div>)}
           <div className="editor-fill" role="group" aria-label={part.w.start+' 不足を補う会社'}><span>不足売上を補う会社</span>{[['u','Uber Eats'],['d','出前館']].map(([key,label])=><button key={key} aria-pressed={part.fill===key} onClick={()=>onChange({...p,dailyPeriods:{...p.dailyPeriods,[part.w.start]:{fill:key}}})}>{label}</button>)}</div>
           <details><summary>金額を指定して件数を逆算</summary><label>配達売上目標（円・空欄で自動）<input aria-label={row.date+'の目標金額'} type="number" min="0" step="1" value={row.draft?(row.draft.basis==='amount'?row.draft.target:''):row.confirmed?(row.confirmed.basis==='amount'?row.confirmed.target:''):row.setting.mode==='amt'?row.setting.value:''} placeholder={String(row.target)} onChange={e=>{if(e.target.validity.valid)edit(row,'target',null,e.target.value);}}/></label><button onClick={()=>edit(row,'target',null,row.target)}>この金額から件数を再計算</button></details>
-          <details><summary>プリセット・計算内訳・今日の残り</summary><p className="sim-note">件数入力は件数×単価で目標を試算し、金額入力は必要件数を逆算します。変更は日別・前半・後半・週の目標へ即時に反映します。</p>
+          <details><summary>プリセット・計算内訳・今日の残り</summary><p className="sim-note">件数入力は件数×単価で売上を試算し、金額入力は必要件数を逆算します。変更は日別・前半・後半・週の集計へ即時に反映します。</p>
             <p data-testid="day-supplement">必須・指定件数の売上に対する不足 {yen(row.deliveryGap||0)} → {row.fill==='u'?'Uber Eats':'出前館'}を追加 {row.salesAdded||0}件</p><p>両社の想定配達売上 <strong data-testid="day-projection">{yen(row.revenue)}</strong></p><p>入力済み配達実績 {yen(row.actual)} ／ 今日の残り {yen(row.remaining)} ／ 必要時間 {row.missingPrice?'単価未設定':dailyTime(row.remainingMinutes)}</p><p>Uber：計画 {row.u}件・実績 {row.actualU}件・残り {row.planRemainingU}件 ／ 出前館：計画 {row.d}件・実績 {row.actualD}件・残り {row.planRemainingD}件</p>
             <label>この日のプリセット<select aria-label={row.date+' プリセット'} defaultValue={p.model} id={'daily-model-'+row.date}>{p.models.map((m,i)=><option key={i} value={i}>{m.name}</option>)}</select></label><button onClick={()=>{const model=p.models[Number(document.getElementById('daily-model-'+row.date).value)];let next=p;for(const key of ['u','d'])for(const field of ['price','uph'])next=dailyEdit(next,row,key,field,field==='price'?model[key]:model.uph);onChange(next);}}>この日だけにプリセットを適用</button>
           </details>
@@ -1186,7 +1183,7 @@ function Planner({view,vault,goals,date,p,onChange,onGoalsChange,navigate,error,
   const [tab,setTab]=useState('week'),[simDate,setSimDate]=useState(today),[notice,setNotice]=useState('');
   useEffect(()=>{if(view==='simulation'){setTab('week');setSimDate(today);}},[view,today]);
   const yen=n=>Math.round(n).toLocaleString()+'円';
-  const change=next=>{try{pvalidate(next);const issue=plinkCheck(next,vault);if(issue)throw Error(issue);if(onChange(next)===false)return false;const editing=Object.entries(next.drafts||{}).some(([d,v])=>JSON.stringify(v)!==JSON.stringify(p.drafts?.[d]));setNotice(editing?'日別計画を保存し、日別・前半・後半・週の目標へ反映しました。':'変更を保存しました。日別計画から目標を集計しました。');return true;}catch(e){setNotice(e.message);return false;}};
+  const change=next=>{try{pvalidate(next);const issue=plinkCheck(next,vault);if(issue)throw Error(issue);if(onChange(next)===false)return false;const editing=Object.entries(next.drafts||{}).some(([d,v])=>JSON.stringify(v)!==JSON.stringify(p.drafts?.[d]));setNotice(editing?'日別計画を保存し、日別・前半・後半・週の集計へ反映しました。':'変更を保存しました。日別計画から合計を集計しました。');return true;}catch(e){setNotice(e.message);return false;}};
   const field=(label,value,fn,opts={})=><label>{label}<input type="number" inputMode="decimal" min="0" step="1" value={value} onChange={e=>{if(e.target.validity.valid)fn(e.target.value);}} {...opts}/></label>;
   const calc=(key,value)=>change({...p,calc:{...p.calc,[key]:value}});
   const dayChange=(d,setting)=>change({...p,days:{...p.days,[d]:setting}});
@@ -1217,7 +1214,7 @@ function Planner({view,vault,goals,date,p,onChange,onGoalsChange,navigate,error,
         </dl>
         <p className="sim-note">配分額は達成時の比較用です。入力済み報酬を重ねて加算しません。</p>
         <div className="money-trio" data-testid="home-trio">
-          <div><span>配達目標</span><strong data-testid="home-target">{sum.off?'休み':sum.hasGoal?yen(sum.target):'未設定'}</strong></div>
+          <div><span>配達計画</span><strong data-testid="home-target">{sum.off?'休み':sum.hasGoal?yen(sum.target):'未設定'}</strong></div>
           <div><span>売上</span><strong data-testid="home-actual">{yen(sum.actual)}</strong></div>
           <div className={sum.over>0?'is-over':''}><span>{sum.over>0?'超過':'あと'}</span><strong data-testid="home-remaining">{sum.hasGoal||sum.off?yen(sum.over>0?sum.over:sum.remain):'—'}</strong></div>
         </div>
@@ -1225,16 +1222,16 @@ function Planner({view,vault,goals,date,p,onChange,onGoalsChange,navigate,error,
         <div className="today-metrics"><div><span>あと必要な件数</span><strong data-testid="home-count">{!sum.hasGoal&&!sum.uberNeed?'—':sum.need===null?'単価を設定':sum.need+'件'}</strong><small>Uber {sum.row.remainingU}件{sum.row.remainingD?' · 出前館 '+sum.row.remainingD+'件':''}</small></div><div><span>あと必要な時間</span><strong data-testid="home-time">{!sum.hasGoal&&!sum.uberNeed?'—':sum.time}</strong></div></div>
         {sum.reason&&<p className="sim-warning">{sum.reason}</p>}
         {sum.quotas.map(q=><p className="sim-note" key={q.id}>Uberクエスト：今日あと{q.today}件（期間残り{q.remaining}件／{q.days}稼働日）{q.unallocated?' · 未配分'+q.unallocated+'件。確定件数と残り稼働日を確認してください':''}</p>)}
-        {!sum.hasGoal&&<p>売上管理で今日の日別計画を入力すると、目標が表示されます。</p>}
+        {!sum.hasGoal&&<p>売上管理で今日の日別計画を入力すると、ここに表示されます。</p>}
       </>}
-      {(()=>{const next=sum.plan.rows.filter(r=>r.date>today&&r.eligible&&r.date<=pdate(today,6));const days=['日','月','火','水','木','金','土'];return next.length?<div className="carry-preview" data-testid="carry-preview"><p className="carry-title">明日以降の目標</p><ul>{next.map(r=>{const diff=r.baseTarget===undefined?0:r.target-r.baseTarget;return <li key={r.date} data-testid={'carry-'+r.date}><span>{r.date.slice(5).replace('-','/')}（{days[new Date(r.date+'T12:00:00').getDay()]}）</span><strong>{yen(r.salesTarget)}</strong>{diff!==0&&<small className={diff>0?'carry-up':'carry-down'}>今日の{diff>0?'不足':'超過'} {diff>0?'＋':'−'}{yen(Math.abs(diff))}</small>}</li>;})}</ul><p className="sim-note">各日の日別計画とクエスト配分額から、達成時の目標を表示します。</p></div>:null;})()}
+      {(()=>{const next=sum.plan.rows.filter(r=>r.date>today&&r.eligible&&r.date<=pdate(today,6));const days=['日','月','火','水','木','金','土'];return next.length?<div className="carry-preview" data-testid="carry-preview"><p className="carry-title">明日以降の計画</p><ul>{next.map(r=>{const diff=r.baseTarget===undefined?0:r.target-r.baseTarget;return <li key={r.date} data-testid={'carry-'+r.date}><span>{r.date.slice(5).replace('-','/')}（{days[new Date(r.date+'T12:00:00').getDay()]}）</span><strong>{yen(r.salesTarget)}</strong>{diff!==0&&<small className={diff>0?'carry-up':'carry-down'}>今日の{diff>0?'不足':'超過'} {diff>0?'＋':'−'}{yen(Math.abs(diff))}</small>}</li>;})}</ul><p className="sim-note">各日の日別計画とクエスト配分額から、達成時の計画を表示します。</p></div>:null;})()}
       <button className="gen-btn sim-open" onClick={()=>navigate('simulation')}>🧮 売上管理 <small>週タブへ →</small></button>
     </div>
   </section>;
   if(view==='settings')return <section className="planner view-container active"><div className="card"><h2>週の単価・UPHプリセット</h2>{p.models.map((m,i)=><div key={i}><h3>{m.name}</h3><div className="grid-3">{['u','d','uph'].map((k,j)=><React.Fragment key={k}>{field(['Uber単価（円）','出前館単価（円）','UPH（件/時）'][j],m[k],v=>change({...p,models:p.models.map((x,z)=>z===i?{...x,[k]:v}:x)}),{step:k==='uph'?'0.1':'any'})}</React.Fragment>)}</div></div>)}</div></section>;
   return <section className="planner view-container active simulation" aria-label="売上管理">
     <div className="sim-heading"><div><h2>🧮 売上管理</h2><p className="sim-note">実績をもとに、次の売上を組み立てる</p></div><button onClick={()=>navigate('dashboard')}>稼働へ →</button></div>
-    <div className="sim-tabs" role="tablist" aria-label="売上管理の期間">{[['week','週'],['month','月'],['year','年']].map(([key,label])=><button key={key} id={'sim-tab-'+key} role="tab" aria-selected={tab===key} aria-controls="simulation-panel" tabIndex={tab===key?0:-1} onKeyDown={e=>{const tabs=['week','month','year'];if(e.key==='ArrowRight'||e.key==='ArrowLeft'){e.preventDefault();const next=tabs[(tabs.indexOf(tab)+(e.key==='ArrowRight'?1:2))%3];setTab(next);document.getElementById('sim-tab-'+next).focus();}}} onClick={()=>{setTab(key);setNotice('');}}>{label}<span>{key==='week'?'日別の配分':key==='month'?'月の見通し':'年の見通し'}</span></button>)}</div>
+    <div className="sim-tabs" role="tablist" aria-label="売上管理の期間">{[['week','週'],['month','月'],['year','年']].map(([key,label])=><button key={key} id={'sim-tab-'+key} role="tab" aria-selected={tab===key} aria-controls="simulation-panel" tabIndex={tab===key?0:-1} onKeyDown={e=>{const tabs=['week','month','year'];if(e.key==='ArrowRight'||e.key==='ArrowLeft'){e.preventDefault();const next=tabs[(tabs.indexOf(tab)+(e.key==='ArrowRight'?1:2))%3];setTab(next);document.getElementById('sim-tab-'+next).focus();}}} onClick={()=>{setTab(key);setNotice('');}}>{label}<span>{key==='week'?'日別計画':key==='month'?'月の見通し':'年の見通し'}</span></button>)}</div>
     <div id="simulation-panel" role="tabpanel" aria-labelledby={'sim-tab-'+tab}>
       <div className="sim-period"><button aria-label="前の期間" onClick={()=>stepPeriod(-1)}>←</button><strong>{tab==='week'?start.slice(5)+' 〜 '+end.slice(5):tab==='month'?simDate.slice(0,7).replace('-','年')+'月':simDate.slice(0,4)+'年'}</strong><button aria-label="次の期間" onClick={()=>stepPeriod(1)}>→</button></div>
       <div className="sim-period-input"><label>{tab==='week'?'週に含まれる日':tab==='month'?'対象月':'対象年'}<input aria-label="売上管理対象期間" type={tab==='week'?'date':tab==='month'?'month':'number'} min={tab==='year'?'2000':undefined} max={tab==='year'?'9999':undefined} value={tab==='week'?simDate:tab==='month'?simDate.slice(0,7):Number(simDate.slice(0,4))} onChange={e=>{const v=e.target.value;if(tab==='year'){if(/^\d{4}$/.test(v)&&Number(v)>=2000)setSimDate(v+'-01-01');}else if(v)setSimDate(tab==='month'?v+'-01':v);}}/></label><button onClick={()=>setSimDate(today)}>今{tab==='week'?'週':tab==='month'?'月':'年'}へ</button></div>
@@ -1249,10 +1246,10 @@ function Planner({view,vault,goals,date,p,onChange,onGoalsChange,navigate,error,
         {tab==='week'?<>
           <section className="card"><h3>週間売上実績</h3><p>入力済みの通常売上・報酬のみ。計画・見込みは含みません。</p><strong data-testid="weekly-actual-total">{yen(actual)}</strong><div className="weekly-actual-chart"><div className="sim-bars">{pdays(start,end).map((d,i)=>{const n=pday(vault,d).total,max=Math.max(1,...pdays(start,end).map(x=>pday(vault,x).total));return <div className="sim-bar-column" key={d}><span>{['月','火','水','木','金','土','日'][i]}</span><small>{d.slice(5)}</small><div className="sim-bar-well"><div className="sim-bar-fill" style={{height:Math.max(0,n)/max*100+'%'}}/></div><small>{yen(n)}</small></div>;})}</div></div><p className="sim-note">幅が狭い画面ではグラフを横へスクロールできます。</p></section>
           <DailyPlanningEditor outlook={outlook} vault={vault} goals={goals} p={p} today={today} onChange={change} onActualDate={onActualDate}/>
-          <p className="sim-note">前半・後半・週売上目標は、日別の配達目標とUber Eatsクエスト配分額の合計です。</p>
+          <p className="sim-note">前半・後半・週の売上計画は、日別の配達計画とUber Eatsクエスト配分額を集計します。</p>
 
           <details className="card quest-settings"><summary>Uber Eats クエストの設定</summary><div><h3>Uber Eats クエスト</h3><p className="sim-note">前半：月〜木 ／ 後半：金〜日。終了は翌日04:00（日本時間）。Uber Eatsの件数だけを集計します。</p><div className="grid-2">{[['front','前半（月〜木）'],['back','後半（金〜日）']].map(([part,label])=>{const qs=part==='front'?week.start:pdate(week.start,4);return <button key={part} disabled={p.quests.some(q=>q.start<=(part==='front'?pdate(week.start,3):week.end)&&q.end>=qs)} onClick={()=>addQuest(part)}>{label}のクエストを追加</button>;})}</div>
-            <p className="sim-note">達成時の報酬を計画入力済みの稼働日へ配分し、日別目標に含めます。</p><p>入力済み売上に含む報酬と別に、未入力の見込み {yen(week.forecast)}</p><p className="sim-note">期間内のUber報酬を見込みから自動控除します。別日に入力した報酬は下で紐付けてください。見込みは売上実績に加算しません。</p>
+            <p className="sim-note">達成時の報酬を計画入力済みの稼働日へ配分し、日別計画に含めます。</p><p>入力済み売上に含む報酬と別に、未入力の見込み {yen(week.forecast)}</p><p className="sim-note">期間内のUber報酬を見込みから自動控除します。別日に入力した報酬は下で紐付けてください。見込みは売上実績に加算しません。</p>
           </div>
           {week.quests.map(({q,recorded,pending})=>{const count=pprogress(vault,q,today),target=pn(q.count)+(q.aim==='extra'?10:0);return <div className="card sim-quest" key={q.id}>
             <h3>{q.start===week.start?'週前半':q.start===pdate(week.start,4)?'週後半':'登録済みクエスト'} · {q.start.slice(5)} 〜 {q.end.slice(5)}</h3>
@@ -1955,6 +1952,12 @@ function App() {
 
           {period === 'day' && (
             <>
+              {date===today&&<div className="card">
+                <button className="gen-btn" data-testid="confirm-day-actual" onClick={()=>updateDayField('actualConfirmed',!dayData.actualConfirmed)}>
+                  {dayData.actualConfirmed?'実績確定を解除':'この日の実績を確定'}
+                </button>
+                <p className="sim-note">{dayData.actualConfirmed?'この日の確定実績を着地見込みに反映しています。':'稼働を終えたら、この日の実績を着地見込みに反映できます。'}</p>
+              </div>}
               <div class="section-title">📝 本日の概要 & コンディション</div>
               <div class="card grid-3">
                 <div><label>営業日</label><input type="date" value={date} onChange={e => setDate(e.target.value)} style={{borderColor:'var(--teal)'}} /></div>

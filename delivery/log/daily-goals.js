@@ -19,15 +19,16 @@ function dailyGoalEntered(p,date,source) {
 }
 function dailyQuestAllocations(vault,goals,p,today) {
   const days={};
-  const quests=pquestMoney(vault,p,today).map(({q,recorded})=>{
+  const quests=pquestMoney(vault,p,today).map(({q,recorded,expected})=>{
     const amount=Math.round(pbudget(q)),claimed=Math.min(amount,Math.round(pn(recorded)));
     const dates=pdays(q.start,q.end).filter(date=>p.days[date]?.mode!=='off'&&dailyGoalEntered(p,date,dailyGoalSource(p,goals,date)));
     const share=(total,i)=>Math.floor(total/dates.length)+(i<total%dates.length?1:0);
     const allocations=dates.map((date,i)=>{
       const value=share(amount,i),recordedShare=share(claimed,i),pending=value-recordedShare;
       const item={id:q.id,date,reward:amount,amount:value,recorded:recordedShare,pending,forecast:q.status==='n',expired:q.status==='n'&&q.end<today};
-      const day=days[date]||(days[date]={amount:0,recorded:0,pending:0,forecast:0,items:[]});
-      day.amount+=value;day.recorded+=recordedShare;day.pending+=pending;day.forecast+=item.forecast?value:0;day.items.push(item);
+      const outlookReward=expected>0?pending:0;
+      const day=days[date]||(days[date]={amount:0,recorded:0,pending:0,forecast:0,outlookReward:0,items:[]});
+      day.amount+=value;day.recorded+=recordedShare;day.pending+=pending;day.forecast+=item.forecast?value:0;day.outlookReward+=outlookReward;day.items.push(item);
       return item;
     });
     return {q,amount,recorded:claimed,pending:amount-claimed,dates,allocations,unallocated:dates.length?0:amount,unallocatedPending:dates.length?0:amount-claimed};
@@ -87,6 +88,7 @@ function dailyGoalPlan(vault,goals,p,date,today) {
     for(const r of part.rows){
       const share=allocations.days[r.date];
       r.questAllocation=share?.amount||0;r.questPendingAllocation=share?.pending||0;r.questRecordedAllocation=share?.recorded||0;r.questForecastAllocation=share?.forecast||0;r.questShares=share?.items||[];
+      r.questOutlookReward=share?.outlookReward||0;
       r.uberDelivery=r.u*r.conditions.u.price;r.demaecanDelivery=r.d*r.conditions.d.price;
       r.salesTarget=r.target+r.questAllocation;
       // The comparison starts with delivery actuals, never actuals including
@@ -104,9 +106,17 @@ function dailyGoalSummary(vault,goals,p,today) {
 }
 function dailyGoalOutlook(vault,goals,p,date,today) {
   const plan=dailyGoalPlan(vault,goals,p,date,today);
-  const parts=plan.parts.map(part=>({part,goal:part.salesGoal,deliveryGoal:part.deliveryGoal,questAllocation:part.questAllocation,questPendingAllocation:part.questPendingAllocation,actual:part.actual,actualDelivery:part.actualDelivery,forecastRewards:part.pendingRewards,active:part.rows.filter(r=>r.eligible),allConfirmed:part.rows.some(r=>r.eligible)&&part.rows.filter(r=>r.eligible).every(r=>r.confirmed&&!r.draft),unallocatedUber:part.nextUnallocatedUber,unallocatedDelivery:part.nextShortfall}));
+  const parts=plan.parts.map(part=>{
+    const landing=part.rows.reduce((total,row)=>{
+      const finished=row.date<today||(row.date===today&&vault[row.date]?.actualConfirmed===true);
+      // Count each day once in the landing. The stored plan remains editable.
+      const delivery=finished||!row.hasPlan?row.actual:row.target;
+      return total+delivery+(row.actualTotal-row.actual)+row.questOutlookReward;
+    },0);
+    return {part,goal:part.salesGoal,deliveryGoal:part.deliveryGoal,questAllocation:part.questAllocation,actual:part.actual,forecastRewards:part.pendingRewards,landing};
+  });
   const sum=k=>parts.reduce((n,p)=>n+p[k],0);
-  return {plan,parts,week:{goal:sum('goal'),deliveryGoal:sum('deliveryGoal'),questAllocation:sum('questAllocation'),questPendingAllocation:sum('questPendingAllocation'),actual:sum('actual'),actualDelivery:sum('actualDelivery'),forecastRewards:sum('forecastRewards')},today};
+  return {plan,parts,week:{goal:sum('goal'),deliveryGoal:sum('deliveryGoal'),questAllocation:sum('questAllocation'),actual:sum('actual'),forecastRewards:sum('forecastRewards'),landing:sum('landing')},today};
 }
 function dailyGoalConfirm(vault,goals,p,date,today) {
   const r=dailyGoalPlan(vault,goals,p,date,today).rows.find(r=>r.date===date);

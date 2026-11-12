@@ -81,3 +81,27 @@ test('actual progress reduces remaining money/counts without changing the target
  let s=c.dailyGoalSummary(v,{},p,mon);assert.equal(s.target,13000);assert.equal(s.remain,0);assert.equal(s.need,0);
  v[mon].sets[0].u_cum=8000;s=c.dailyGoalSummary(v,{},p,mon);assert.equal(s.remain,5000);assert.ok(s.need>0);assert.equal(s.target,13000);
 });
+test('finalizing sales changes the landing only, with shortfalls and overages isolated to their half',()=>{
+ const thu='2026-11-05',sun='2026-11-08';
+ let p=counts(counts(counts(plan(),mon,'25','0'),thu,'0','24'),sun,'0','16');
+ const v={[mon]:{sets:[{u_cum:8000}]}},before=JSON.stringify(p);
+ assert.equal(view(p,{},v).parts[0].landing,22000);
+ v[mon].actualConfirmed=true;
+ let o=view(p,{},v);
+ assert.deepEqual(totals(o),[22000,8000,30000]);
+ assert.equal(o.parts[0].landing,20000);assert.equal(o.parts[1].landing,8000);assert.equal(o.week.landing,28000);
+ assert.equal(view(p,{},v,thu).week.landing,28000);
+ v[mon].sets[0].u_cum=12000;assert.equal(view(p,{},v).week.landing,32000);
+ assert.equal(JSON.stringify(p),before);
+ p=edit(p,sun,'d','count','10');o=view(p,{},v,sun);
+ assert.equal(o.parts[1].landing,5000);assert.equal(o.parts[1].goal,5000);
+});
+test('landing uses actual rewards plus outstanding quest rewards once and excludes expired estimates',()=>{
+ const p=counts(plan(),mon,'25','0');
+ p.quests=[{id:'q',start:mon,end:'2026-11-05',count:40,base:6000,extra:0,adjust:0,aim:'base',finish:'n',status:'n',links:[]}];
+ const v={[mon]:{actualConfirmed:true,sets:[{u_cum:8000,u_que_cum:2000}]}};
+ assert.equal(view(p,{},v).parts[0].landing,14000);
+ assert.equal(view(p,{},v,fri).parts[0].landing,10000);
+ p.quests[0].status='base';
+ assert.equal(view(p,{},v,fri).parts[0].landing,14000);
+});

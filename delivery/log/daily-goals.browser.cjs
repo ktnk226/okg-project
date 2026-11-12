@@ -1,7 +1,7 @@
 const {chromium,devices}=require('playwright');
 const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
 const url=process.env.DELILOG_TEST_URL||'http://127.0.0.1:8060/delivery/log/';
-const mon='2026-11-02',tue='2026-11-03',fri='2026-11-06';
+const mon='2026-11-02',tue='2026-11-03',fri='2026-11-06',sun='2026-11-08';
 const yen=n=>n.toLocaleString()+'円';
 async function verify(page,mobile,oldGoal){
   await page.evaluate(({mon,oldGoal})=>{
@@ -9,6 +9,7 @@ async function verify(page,mobile,oldGoal){
     const g=oldGoal?psetPart(psetPart({},mon,'front',300000),mon,'back',500000):{};
     g['M-2026-11']={amt:400000};g['Y-2026']={amt:5000000};
     localStorage.setItem('delivery_log_planning_v15',JSON.stringify(p));localStorage.setItem('delivery_log_periodic_goals_v13',JSON.stringify(g));localStorage.setItem('delivery_log_current_date_v13',mon);
+    localStorage.setItem('delivery_log_vault_v13',JSON.stringify({[mon]:{sets:[{u_cum:6000,u_cnt_cum:15}]}}));
   },{mon,oldGoal});
   await page.reload();await page.locator('.sim-open').click();
   const goalsBefore=await page.evaluate(()=>localStorage.getItem('delivery_log_periodic_goals_v13'));
@@ -28,6 +29,12 @@ async function verify(page,mobile,oldGoal){
   await totals(0,0);assert.equal(await page.getByText('週の売上目標を設定',{exact:true}).count(),0);
   await day(mon);await input(mon,'u').fill('20');await totals(8000,0);assert.equal(await page.getByTestId('day-target').innerText(),'8,000円');
   await input(mon,'d').fill('10');await totals(13000,0);
+  assert.equal(await page.getByTestId('front-landing').innerText(),yen(13000));
+  await page.getByRole('button',{name:'稼働へ →',exact:true}).click();
+  await page.getByTestId('confirm-day-actual').click();
+  await page.locator('.sim-open').click();
+  assert.equal(await page.getByTestId('front-landing').innerText(),yen(6000));
+  await totals(13000,0);await day(mon);
   await input(mon,'u','通常単価（円）').fill('450');await totals(14000,0);
   await day(tue);await amount(tue,'1001');await totals(15001,0);assert.equal(await page.getByTestId('day-target').innerText(),'1,001円');
   await part(true);await day(fri);await input(fri,'u').fill('10');await input(fri,'d').fill('4');await totals(15001,6000);
@@ -39,6 +46,10 @@ async function verify(page,mobile,oldGoal){
   await day(tue);await page.getByTestId('delete-daily-plan').click();await totals(0,6400);
   await part(true);await day(fri);await amount(fri,'7001');await totals(0,7001);
   await page.getByTestId('confirm-plan').click();await totals(0,7001);
+  await day(sun);await amount(sun,'2000');await page.getByTestId('confirm-plan').click();
+  await amount(sun,'3000');await totals(0,10001);
+  assert.equal(await page.getByTestId('back-landing').innerText(),yen(10001));
+  await page.getByTestId('delete-daily-plan').click();await totals(0,7001);
   await page.reload();await page.locator('.sim-open').click();await totals(0,7001);
   await page.getByRole('button',{name:'次の期間',exact:true}).click();await totals(0,0);
   await page.getByRole('button',{name:'前の期間',exact:true}).click();await totals(0,7001);
@@ -48,6 +59,7 @@ async function verify(page,mobile,oldGoal){
   await page.locator(mobile?'.bottom-nav':'.nav-menu').getByRole('button',{name:mobile?'設定':'⚙️ 設定・同期',exact:true}).click();
   const download=page.waitForEvent('download');await page.getByRole('button',{name:'💾 iCloudへ完全保存',exact:true}).click();
   const backup=JSON.parse(fs.readFileSync(await(await download).path(),'utf8'));assert.equal(backup.version,16);
+  assert.equal(backup.vault[mon].actualConfirmed,true);
   await page.reload();await page.locator('.sim-open').click();await part(true);await day(fri);await page.getByTestId('delete-daily-plan').click();await totals(0,0);
   await page.getByRole('button',{name:'稼働へ →',exact:true}).click();
   await page.locator(mobile?'.bottom-nav':'.nav-menu').getByRole('button',{name:mobile?'設定':'⚙️ 設定・同期',exact:true}).click();
